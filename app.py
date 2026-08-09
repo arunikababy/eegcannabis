@@ -250,11 +250,12 @@ h1.hero-title {
 }
 
 .hero-description {
-    max-width: 760px;
+    max-width: 980px;
     margin: 0 auto;
     color: #69736c;
     font-size: 1rem;
     line-height: 1.8;
+    text-align: center;
 }
 
 .hero-line {
