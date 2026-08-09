@@ -13,147 +13,344 @@ st.set_page_config(
 
 RESULTS_DATA = pd.DataFrame(
     [
-        {"Band": "Gamma", "Classifier": "SVM", "Training Accuracy": 0.8491, "Test Accuracy": 0.8195},
-        {"Band": "Gamma", "Classifier": "Random Forest", "Training Accuracy": 0.8856, "Test Accuracy": 0.7955},
-        {"Band": "Gamma", "Classifier": "1D CNN", "Training Accuracy": 0.8371, "Test Accuracy": 0.8088},
-
-        {"Band": "Beta", "Classifier": "SVM", "Training Accuracy": 0.8578, "Test Accuracy": 0.8168},
-        {"Band": "Beta", "Classifier": "Random Forest", "Training Accuracy": 0.8876, "Test Accuracy": 0.7794},
-        {"Band": "Beta", "Classifier": "1D CNN", "Training Accuracy": 0.8667, "Test Accuracy": 0.7901},
-
-        {"Band": "Alpha", "Classifier": "SVM", "Training Accuracy": 0.8503, "Test Accuracy": 0.8249},
-        {"Band": "Alpha", "Classifier": "Random Forest", "Training Accuracy": 0.8779, "Test Accuracy": 0.7901},
-        {"Band": "Alpha", "Classifier": "1D CNN", "Training Accuracy": 0.8549, "Test Accuracy": 0.7995},
-
-        {"Band": "Theta", "Classifier": "SVM", "Training Accuracy": 0.8466, "Test Accuracy": 0.8316},
-        {"Band": "Theta", "Classifier": "Random Forest", "Training Accuracy": 0.8868, "Test Accuracy": 0.8088},
-        {"Band": "Theta", "Classifier": "1D CNN", "Training Accuracy": 0.8319, "Test Accuracy": 0.8128},
-
-        {"Band": "Delta", "Classifier": "SVM", "Training Accuracy": 0.8388, "Test Accuracy": 0.8249},
-        {"Band": "Delta", "Classifier": "Random Forest", "Training Accuracy": 0.8414, "Test Accuracy": 0.7914},
-        {"Band": "Delta", "Classifier": "1D CNN", "Training Accuracy": 0.8563, "Test Accuracy": 0.8075},
-
-        {"Band": "All Bands", "Classifier": "SVM", "Training Accuracy": 0.8736, "Test Accuracy": 0.8316},
-        {"Band": "All Bands", "Classifier": "Random Forest", "Training Accuracy": 0.9057, "Test Accuracy": 0.8168},
-        {"Band": "All Bands", "Classifier": "1D CNN", "Training Accuracy": 0.8727, "Test Accuracy": 0.8035},
+        {
+            "Band": "Gamma",
+            "Classifier": "SVM",
+            "Training Accuracy": 0.8491,
+            "Test Accuracy": 0.8195,
+        },
+        {
+            "Band": "Gamma",
+            "Classifier": "Random Forest",
+            "Training Accuracy": 0.8856,
+            "Test Accuracy": 0.7955,
+        },
+        {
+            "Band": "Gamma",
+            "Classifier": "1D CNN",
+            "Training Accuracy": 0.8371,
+            "Test Accuracy": 0.8088,
+        },
+        {
+            "Band": "Beta",
+            "Classifier": "SVM",
+            "Training Accuracy": 0.8578,
+            "Test Accuracy": 0.8168,
+        },
+        {
+            "Band": "Beta",
+            "Classifier": "Random Forest",
+            "Training Accuracy": 0.8876,
+            "Test Accuracy": 0.7794,
+        },
+        {
+            "Band": "Beta",
+            "Classifier": "1D CNN",
+            "Training Accuracy": 0.8667,
+            "Test Accuracy": 0.7901,
+        },
+        {
+            "Band": "Alpha",
+            "Classifier": "SVM",
+            "Training Accuracy": 0.8503,
+            "Test Accuracy": 0.8249,
+        },
+        {
+            "Band": "Alpha",
+            "Classifier": "Random Forest",
+            "Training Accuracy": 0.8779,
+            "Test Accuracy": 0.7901,
+        },
+        {
+            "Band": "Alpha",
+            "Classifier": "1D CNN",
+            "Training Accuracy": 0.8549,
+            "Test Accuracy": 0.7995,
+        },
+        {
+            "Band": "Theta",
+            "Classifier": "SVM",
+            "Training Accuracy": 0.8466,
+            "Test Accuracy": 0.8316,
+        },
+        {
+            "Band": "Theta",
+            "Classifier": "Random Forest",
+            "Training Accuracy": 0.8868,
+            "Test Accuracy": 0.8088,
+        },
+        {
+            "Band": "Theta",
+            "Classifier": "1D CNN",
+            "Training Accuracy": 0.8319,
+            "Test Accuracy": 0.8128,
+        },
+        {
+            "Band": "Delta",
+            "Classifier": "SVM",
+            "Training Accuracy": 0.8388,
+            "Test Accuracy": 0.8249,
+        },
+        {
+            "Band": "Delta",
+            "Classifier": "Random Forest",
+            "Training Accuracy": 0.8414,
+            "Test Accuracy": 0.7914,
+        },
+        {
+            "Band": "Delta",
+            "Classifier": "1D CNN",
+            "Training Accuracy": 0.8563,
+            "Test Accuracy": 0.8075,
+        },
+        {
+            "Band": "All Bands",
+            "Classifier": "SVM",
+            "Training Accuracy": 0.8736,
+            "Test Accuracy": 0.8316,
+        },
+        {
+            "Band": "All Bands",
+            "Classifier": "Random Forest",
+            "Training Accuracy": 0.9057,
+            "Test Accuracy": 0.8168,
+        },
+        {
+            "Band": "All Bands",
+            "Classifier": "1D CNN",
+            "Training Accuracy": 0.8727,
+            "Test Accuracy": 0.8035,
+        },
     ]
 )
 
 
 FEATURES_DATA = pd.DataFrame(
     [
-        {"Feature": "Band Power", "Code": "BP", "Features": 20, "Domain": "Frequency"},
-        {"Feature": "Relative Power", "Code": "RP", "Features": 20, "Domain": "Frequency"},
-        {"Feature": "Entropy", "Code": "EN", "Features": 4, "Domain": "Time Frequency"},
-        {"Feature": "Hjorth Parameters", "Code": "HJ", "Features": 12, "Domain": "Time"},
-        {"Feature": "Spectral Flux", "Code": "SF", "Features": 4, "Domain": "Frequency"},
-        {"Feature": "Spectral Ratio", "Code": "SR", "Features": 4, "Domain": "Frequency"},
-        {"Feature": "Discrete Wavelet Transform", "Code": "DWT", "Features": 72, "Domain": "Time Frequency"},
-        {"Feature": "Wavelet Packet", "Code": "WP", "Features": 64, "Domain": "Time Frequency"},
-        {"Feature": "Zero Crossing Rate", "Code": "ZCR", "Features": 4, "Domain": "Time"},
-        {"Feature": "Root Mean Square", "Code": "RMS", "Features": 4, "Domain": "Time"},
+        {
+            "Feature": "Band Power",
+            "Code": "BP",
+            "Features": 20,
+            "Domain": "Frequency",
+        },
+        {
+            "Feature": "Relative Power",
+            "Code": "RP",
+            "Features": 20,
+            "Domain": "Frequency",
+        },
+        {
+            "Feature": "Entropy",
+            "Code": "EN",
+            "Features": 4,
+            "Domain": "Time Frequency",
+        },
+        {
+            "Feature": "Hjorth Parameters",
+            "Code": "HJ",
+            "Features": 12,
+            "Domain": "Time",
+        },
+        {
+            "Feature": "Spectral Flux",
+            "Code": "SF",
+            "Features": 4,
+            "Domain": "Frequency",
+        },
+        {
+            "Feature": "Spectral Ratio",
+            "Code": "SR",
+            "Features": 4,
+            "Domain": "Frequency",
+        },
+        {
+            "Feature": "Discrete Wavelet Transform",
+            "Code": "DWT",
+            "Features": 72,
+            "Domain": "Time Frequency",
+        },
+        {
+            "Feature": "Wavelet Packet",
+            "Code": "WP",
+            "Features": 64,
+            "Domain": "Time Frequency",
+        },
+        {
+            "Feature": "Zero Crossing Rate",
+            "Code": "ZCR",
+            "Features": 4,
+            "Domain": "Time",
+        },
+        {
+            "Feature": "Root Mean Square",
+            "Code": "RMS",
+            "Features": 4,
+            "Domain": "Time",
+        },
     ]
 )
 
 
-st.markdown(
-    """
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+CUSTOM_CSS = """<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
-        * {
-            font-family: "Manrope", sans-serif;
-        }
+* {
+    font-family: "Manrope", sans-serif;
+}
 
-        .stApp {
-            background:
-                radial-gradient(circle at 100% 0%, #edf8ef 0%, transparent 27%),
-                #ffffff;
-        }
+.stApp {
+    background:
+        radial-gradient(circle at 100% 0%, #edf8ef 0%, transparent 27%),
+        #ffffff;
+}
 
-        header[data-testid="stHeader"] {
-            background: transparent;
-        }
+header[data-testid="stHeader"] {
+    background: transparent;
+}
 
-        #MainMenu, footer {
-            visibility: hidden;
-        }
+#MainMenu, footer {
+    visibility: hidden;
+}
 
-        .block-container {
-            max-width: 1180px;
-            padding-top: 2.4rem;
-            padding-bottom: 3.5rem;
-        }
+.block-container {
+    max-width: 1180px;
+    padding-top: 2.4rem;
+    padding-bottom: 3.5rem;
+}
 
-        h1 {
-            color: #20252b;
-            font-weight: 800;
-            letter-spacing: -0.06em;
-        }
+.hero-center {
+    text-align: center;
+    padding: 2.2rem 1rem 2.5rem;
+}
 
-        h2, h3 {
-            color: #20252b;
-            font-weight: 700;
-        }
+.report-label {
+    display: inline-block;
+    color: #1f6b35;
+    background: #eaf5ed;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+}
 
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 20px;
-            border: 1px solid #dbe7de;
-            background: #ffffff;
-            box-shadow: 0 10px 28px rgba(31, 70, 42, 0.07);
-            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-        }
+h1.hero-title {
+    margin: 1.1rem 0 0.9rem;
+    font-size: clamp(2.2rem, 4.2vw, 3.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.07em;
+}
 
-        div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-            transform: translateY(-6px);
-            border-color: #1f6b35;
-            box-shadow: 0 18px 38px rgba(31, 107, 53, 0.15);
-        }
+.title-green {
+    color: #1f6b35;
+}
 
-        div[data-testid="stMetric"] {
-            border: 1px solid #dbe7de;
-            border-radius: 16px;
-            padding: 18px;
-            background: #ffffff;
-            box-shadow: 0 8px 22px rgba(31, 70, 42, 0.05);
-        }
+.title-black {
+    color: #20252b;
+}
 
-        div[data-testid="stMetricValue"] {
-            color: #1f6b35;
-        }
+.hero-description {
+    max-width: 760px;
+    margin: 0 auto;
+    color: #69736c;
+    font-size: 1rem;
+    line-height: 1.8;
+}
 
-        div.stButton > button {
-            background: #1f6b35;
-            color: #ffffff;
-            border: 1px solid #1f6b35;
-            border-radius: 12px;
-            font-weight: 700;
-            min-height: 44px;
-        }
+.hero-line {
+    width: 86px;
+    height: 4px;
+    border-radius: 99px;
+    margin: 1.7rem auto 0;
+    background: linear-gradient(90deg, #1f6b35, #9ad5a8);
+}
 
-        div.stButton > button:hover {
-            background: #155126;
-            border-color: #155126;
-            color: #ffffff;
-        }
+.section-center {
+    text-align: center;
+    padding: 0.8rem 0 1rem;
+}
 
-        button[data-baseweb="tab"] {
-            font-weight: 700;
-        }
+.section-center h2 {
+    margin: 0;
+    color: #20252b;
+    font-size: 1.45rem;
+    font-weight: 750;
+}
 
-        button[data-baseweb="tab"][aria-selected="true"] {
-            color: #1f6b35;
-        }
+.section-center p {
+    margin-top: 0.55rem;
+    color: #69736c;
+    font-size: 0.95rem;
+}
 
-        @media (max-width: 760px) {
-            .block-container {
-                padding: 1.4rem 1rem 2.5rem;
-            }
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+h1 {
+    color: #20252b;
+    font-weight: 800;
+    letter-spacing: -0.06em;
+}
+
+h2, h3 {
+    color: #20252b;
+    font-weight: 700;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 20px;
+    border: 1px solid #dbe7de;
+    background: #ffffff;
+    box-shadow: 0 10px 28px rgba(31, 70, 42, 0.07);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    transform: translateY(-6px);
+    border-color: #1f6b35;
+    box-shadow: 0 18px 38px rgba(31, 107, 53, 0.15);
+}
+
+div[data-testid="stMetric"] {
+    border: 1px solid #dbe7de;
+    border-radius: 16px;
+    padding: 18px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(31, 70, 42, 0.05);
+}
+
+div[data-testid="stMetricValue"] {
+    color: #1f6b35;
+}
+
+div.stButton > button {
+    background: #1f6b35;
+    color: #ffffff;
+    border: 1px solid #1f6b35;
+    border-radius: 12px;
+    font-weight: 700;
+    min-height: 44px;
+}
+
+div.stButton > button:hover {
+    background: #155126;
+    border-color: #155126;
+    color: #ffffff;
+}
+
+button[data-baseweb="tab"] {
+    font-weight: 700;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #1f6b35;
+}
+
+@media (max-width: 760px) {
+    .block-container {
+        padding: 1.4rem 1rem 2.5rem;
+    }
+}
+</style>"""
+
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 def open_report(report_name):
@@ -166,7 +363,14 @@ def return_to_home():
     st.rerun()
 
 
-def report_card(label, title, description, tag, button_text, report_name):
+def render_report_card(
+    label,
+    title,
+    description,
+    tag,
+    button_text,
+    report_name,
+):
     with st.container(border=True):
         st.caption(label)
         st.subheader(title)
@@ -183,34 +387,45 @@ def report_card(label, title, description, tag, button_text, report_name):
 
 
 def render_landing_page():
-    empty_left, hero_column, empty_right = st.columns([1, 4, 1])
+    hero_html = (
+        "<div class='hero-center'>"
+        "<div class='report-label'>REPORT</div>"
+        "<h1 class='hero-title'>"
+        "<span class='title-green'>Cannabis EEG</span> "
+        "<span class='title-black'>Classification</span><br>"
+        "<span class='title-black'>Research</span> "
+        "<span class='title-green'>Portal</span>"
+        "</h1>"
+        "<p class='hero-description'>"
+        "Artificial Intelligence for cannabis classification using "
+        "Auxiliary Classifier Generative Adversarial Network."
+        "</p>"
+        "<div class='hero-line'></div>"
+        "</div>"
+    )
 
-    with hero_column:
-        st.caption("REPORT")
-        st.title("Cannabis EEG Classification Research Portal")
-        st.markdown(
-            "Artificial Intelligence for cannabis classification using "
-            "Auxiliary Classifier Generative Adversarial Network."
-        )
+    st.markdown(hero_html, unsafe_allow_html=True)
 
-    st.write("")
     st.divider()
 
-    title_left, title_center, title_right = st.columns([1, 4, 1])
+    section_html = (
+        "<div class='section-center'>"
+        "<h2>Choose one of the available reports</h2>"
+        "<p>"
+        "Select an experimental scale to explore EEG processing, "
+        "model development, and classification results."
+        "</p>"
+        "</div>"
+    )
 
-    with title_center:
-        st.subheader("Choose one of the available reports")
-        st.caption(
-            "Select an experimental scale to explore EEG processing, "
-            "model development, and classification results."
-        )
+    st.markdown(section_html, unsafe_allow_html=True)
 
     st.write("")
 
-    column_1, column_2 = st.columns(2)
+    first_column, second_column = st.columns(2)
 
-    with column_1:
-        report_card(
+    with first_column:
+        render_report_card(
             label="EXPERIMENTAL REPORT 01",
             title="Subject 02",
             description=(
@@ -222,8 +437,8 @@ def render_landing_page():
             report_name="subject_02",
         )
 
-    with column_2:
-        report_card(
+    with second_column:
+        render_report_card(
             label="EXPERIMENTAL REPORT 02",
             title="Subject 10",
             description=(
@@ -237,10 +452,10 @@ def render_landing_page():
 
     st.write("")
 
-    column_3, column_4 = st.columns(2)
+    third_column, fourth_column = st.columns(2)
 
-    with column_3:
-        report_card(
+    with third_column:
+        render_report_card(
             label="EXPERIMENTAL REPORT 03",
             title="Subject 30",
             description=(
@@ -253,7 +468,7 @@ def render_landing_page():
             report_name="subject_30",
         )
 
-    with column_4:
+    with fourth_column:
         with st.container(border=True):
             st.caption("EXPERIMENTAL REPORT 04")
             st.subheader("Future Subject")
@@ -308,9 +523,9 @@ def render_subject_02():
     )
 
     with overview_tab:
-        col_1, col_2 = st.columns(2)
+        left_column, right_column = st.columns(2)
 
-        with col_1:
+        with left_column:
             with st.container(border=True):
                 st.subheader("Research objective")
                 st.write(
@@ -318,7 +533,7 @@ def render_subject_02():
                     "using machine-learning and deep-learning models."
                 )
 
-        with col_2:
+        with right_column:
             with st.container(border=True):
                 st.subheader("Classification labels")
                 st.write("Label 0: BCF, BCM, BF, and BM.")
@@ -358,7 +573,11 @@ def render_subject_02():
             }
         )
 
-        st.dataframe(conditions, use_container_width=True, hide_index=True)
+        st.dataframe(
+            conditions,
+            use_container_width=True,
+            hide_index=True,
+        )
 
         st.subheader("EEG channels")
 
@@ -394,7 +613,9 @@ def render_subject_02():
             ),
         ]
 
-        for index, (title, description) in enumerate(preprocessing_steps, start=1):
+        for index, item in enumerate(preprocessing_steps, start=1):
+            title, description = item
+
             with st.container(border=True):
                 st.subheader(f"{index}. {title}")
                 st.write(description)
@@ -419,8 +640,8 @@ def render_subject_02():
                 "Spectral Flux, and Spectral Ratio."
             )
             st.write(
-                "Time-frequency features include Entropy, Discrete Wavelet Transform, "
-                "and Wavelet Packet."
+                "Time-frequency features include Entropy, "
+                "Discrete Wavelet Transform, and Wavelet Packet."
             )
 
     with models_tab:
@@ -463,7 +684,11 @@ def render_subject_02():
             }
         )
 
-        st.dataframe(split_data, use_container_width=True, hide_index=True)
+        st.dataframe(
+            split_data,
+            use_container_width=True,
+            hide_index=True,
+        )
 
     with acgan_tab:
         st.subheader("ACGAN-based data augmentation")
@@ -494,14 +719,25 @@ def render_subject_02():
             }
         )
 
-        st.dataframe(acgan_data, use_container_width=True, hide_index=True)
+        st.dataframe(
+            acgan_data,
+            use_container_width=True,
+            hide_index=True,
+        )
 
     with results_tab:
         st.subheader("Classification performance")
 
         selected_band = st.selectbox(
             "Select frequency band",
-            options=["All Bands", "Gamma", "Beta", "Alpha", "Theta", "Delta"],
+            options=[
+                "All Bands",
+                "Gamma",
+                "Beta",
+                "Alpha",
+                "Theta",
+                "Delta",
+            ],
         )
 
         selected_results = RESULTS_DATA[
@@ -539,15 +775,20 @@ def render_subject_02():
             yaxis=dict(range=[0, 1], tickformat=".0%"),
         )
 
-        st.plotly_chart(figure, use_container_width=True)
+        st.plotly_chart(
+            figure,
+            use_container_width=True,
+        )
 
         display_results = selected_results.copy()
-        display_results["Training Accuracy"] = display_results["Training Accuracy"].map(
-            lambda value: f"{value:.2%}"
-        )
-        display_results["Test Accuracy"] = display_results["Test Accuracy"].map(
-            lambda value: f"{value:.2%}"
-        )
+
+        display_results["Training Accuracy"] = display_results[
+            "Training Accuracy"
+        ].map(lambda value: f"{value:.2%}")
+
+        display_results["Test Accuracy"] = display_results[
+            "Test Accuracy"
+        ].map(lambda value: f"{value:.2%}")
 
         st.dataframe(
             display_results,
@@ -589,16 +830,24 @@ def render_empty_report(subject_name, report_number, user_count):
         "is completed."
     )
 
-    if st.button(f"Back to all reports", key=f"back_{subject_name}"):
+    if st.button(
+        "Back to all reports",
+        key=f"back_{subject_name}",
+    ):
         return_to_home()
 
     st.write("")
 
-    tab_1, tab_2, tab_3, tab_4 = st.tabs(
-        ["Overview", "Dataset", "Models", "Results"]
+    overview_tab, dataset_tab, models_tab, results_tab = st.tabs(
+        [
+            "Overview",
+            "Dataset",
+            "Models",
+            "Results",
+        ]
     )
 
-    with tab_1:
+    with overview_tab:
         with st.container(border=True):
             st.subheader("Report introduction")
             st.write(
@@ -606,7 +855,7 @@ def render_empty_report(subject_name, report_number, user_count):
                 f"experimental workflow for the {user_count}-user study."
             )
 
-    with tab_2:
+    with dataset_tab:
         with st.container(border=True):
             st.subheader("Dataset status")
             st.write(
@@ -614,7 +863,7 @@ def render_empty_report(subject_name, report_number, user_count):
                 "The BCM and ACM EEG data will appear here."
             )
 
-    with tab_3:
+    with models_tab:
         with st.container(border=True):
             st.subheader("Model status")
             st.write(
@@ -622,7 +871,7 @@ def render_empty_report(subject_name, report_number, user_count):
                 "results will be added here."
             )
 
-    with tab_4:
+    with results_tab:
         with st.container(border=True):
             st.subheader("Results status")
             st.write(
