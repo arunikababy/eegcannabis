@@ -13,6 +13,9 @@ st.set_page_config(
 )
 
 
+APP_ROOT = Path(__file__).resolve().parent
+
+
 RESULTS_DATA = pd.DataFrame(
     [
         ("Gamma", "SVM", 0.8491, 0.8195),
@@ -80,6 +83,8 @@ SELECTED_FEATURES_DATA = pd.DataFrame(
         "Domain",
     ],
 )
+
+
 CONFUSION_MATRIX_IMAGES = {
     "Gamma": "assets/confusion_matrix/gamma_confusion_matrix.png",
     "Beta": "assets/confusion_matrix/beta_confusion_matrix.png",
@@ -201,21 +206,17 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     background: rgba(255, 255, 255, 0.58);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-
     border: 1px solid rgba(255, 255, 255, 0.75);
     border-radius: 20px;
-
     box-shadow:
         0 10px 30px rgba(31, 107, 53, 0.10),
         inset 0 1px 0 rgba(255, 255, 255, 0.55);
-
     transition: all 0.25s ease;
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-6px);
     border-color: rgba(31, 107, 53, 0.45);
-
     box-shadow:
         0 18px 38px rgba(31, 107, 53, 0.18),
         inset 0 1px 0 rgba(255, 255, 255, 0.70);
@@ -412,7 +413,6 @@ def render_subject_02():
     st.write("")
 
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-
     metric_1.metric("EEG Epochs", "2,488")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
@@ -467,7 +467,6 @@ def render_subject_02():
         st.subheader("Dataset summary")
 
         dataset_1, dataset_2, dataset_3 = st.columns(3)
-
         dataset_1.metric("Before Condition", "1,244 epochs")
         dataset_2.metric("After Condition", "1,244 epochs")
         dataset_3.metric("Epoch Shape", "(512, 4)")
@@ -508,7 +507,6 @@ def render_subject_02():
         st.subheader("EEG channels")
 
         channel_1, channel_2, channel_3, channel_4 = st.columns(4)
-
         channel_1.metric("Channel", "RAW_TP9")
         channel_2.metric("Channel", "RAW_AF7")
         channel_3.metric("Channel", "RAW_AF8")
@@ -661,7 +659,6 @@ def render_subject_02():
         st.subheader("ACGAN-based data augmentation")
 
         acgan_1, acgan_2, acgan_3 = st.columns(3)
-
         acgan_1.metric("Real Training Data", "1,740")
         acgan_2.metric("Synthetic Training Data", "1,740")
         acgan_3.metric("Mixed Training Data", "3,480")
@@ -780,22 +777,24 @@ def render_subject_02():
         )
 
         with st.container(border=True):
-    st.subheader("Confusion Matrix")
+            st.subheader("Confusion Matrix")
 
-    image_path = Path(CONFUSION_MATRIX_IMAGES[selected_band])
+            image_path = (
+                APP_ROOT
+                / CONFUSION_MATRIX_IMAGES[selected_band]
+            )
 
-    if image_path.exists():
-        st.image(
-            str(image_path),
-            caption=f"Confusion Matrix, {selected_band}, Subject 02",
-            use_container_width=True,
-        )
-    else:
-        st.warning(
-            f"Image for {selected_band} has not been found. "
-            f"Check this file path: {image_path}"
-        )
-
+            if image_path.exists():
+                st.image(
+                    image_path,
+                    caption=f"Confusion Matrix, {selected_band}, Subject 02",
+                    use_container_width=True,
+                )
+            else:
+                st.warning(
+                    f"Image for {selected_band} has not been found. "
+                    f"Expected path: {image_path}"
+                )
 
 
 def render_empty_report(subject_name, report_number, user_count):
