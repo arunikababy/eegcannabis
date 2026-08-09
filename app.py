@@ -389,21 +389,22 @@ def render_report_card(
 
 def render_landing_page():
     hero_html = (
-        "<div class='hero-center'>"
-        "<div class='report-label'>REPORT</div>"
-        "<h1 class='hero-title'>"
-        "<span class='title-green'>Cannabis EEG</span> "
-        "<span class='title-black'>Classification</span><br>"
-        "<span class='title-black'>Research</span> "
-        "<span class='title-green'>Portal</span>"
-        "</h1>"
-        "<p class='hero-description'>"
-        "Deep Generative for cannabis classification using "
-        "Auxiliary Classifier Generative Adversarial Network."
-        "</p>"
-        "<div class='hero-line'></div>"
-        "</div>"
-    )
+    "<div class='hero-center'>"
+    "<div class='report-label'>REPORT</div>"
+    "<h1 class='hero-title'>"
+    "<span class='title-green'>Cannabis EEG</span> "
+    "<span class='title-black'>Classification</span><br>"
+    "<span class='title-black'>Research</span> "
+    "<span class='title-green'>Portal</span>"
+    "</h1>"
+    "<p class='hero-description'>"
+    "Deep Generative Modeling for Cannabis Classification Using "
+    "Auxiliary Classifier Generative Adversarial Network (ACGAN)"
+    "</p>"
+    "<div class='hero-line'></div>"
+    "</div>"
+)
+
 
     st.markdown(hero_html, unsafe_allow_html=True)
 
