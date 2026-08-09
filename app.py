@@ -280,22 +280,22 @@ def render_landing_page():
     with first_column:
         render_report_card(
             "EXPERIMENTAL REPORT 01",
-            "Subject 02",
+            "Cannabis Subject No. 2",
             "Single-subject cannabis EEG classification with preprocessing, feature extraction, "
             "ACGAN augmentation, and model evaluation.",
             "2,488 Data Distribution",
             "Explore Report",
-            "subject_02",
+            "Cannabis_Subject_No._2",
         )
     with second_column:
         render_report_card(
             "EXPERIMENTAL REPORT 02",
-            "Subject 10",
+            "EEG Data Analysis of 10 Cannabis Subjects: BCF vs ACF",
             "Multi-subject cannabis EEG analysis prepared for a comparative study across "
             "10 users, focusing on BCF versus ACF conditions.",
             "BCF vs ACF",
             "Explore Report",
-            "subject_10",
+            "EEG_Data_Analysis_of_10_Cannabis_Subjects:_BCF_vs_ACF",
         )
 
     st.write("")
