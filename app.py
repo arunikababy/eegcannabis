@@ -261,8 +261,8 @@ def render_landing_page():
         "<span class='title-green'>Portal</span>"
         "</h1>"
         "<p class='hero-description'>"
-        "Deep Generative Modeling for Cannabis Classification Using "
-        "Auxiliary Classifier Generative Adversarial Network (ACGAN)"
+        "Deep Generative Modeling for Cannabis Classification"
+        ""
         "</p><div class='hero-line'></div></div>"
     )
     st.markdown(hero_html, unsafe_allow_html=True)
@@ -283,7 +283,7 @@ def render_landing_page():
             "Subject 02",
             "Single-subject cannabis EEG classification with preprocessing, feature extraction, "
             "ACGAN augmentation, and model evaluation.",
-            "2,488 EEG Epochs",
+            "2,488 Data Distribution",
             "Explore Report",
             "subject_02",
         )
@@ -383,7 +383,7 @@ def render_subject_02():
 
     st.write("")
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-    metric_1.metric("EEG Epochs", "2,488")
+    metric_1.metric("Data Distribution", "2,488")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
     metric_4.metric("Total Features", "56")
@@ -538,7 +538,7 @@ def render_subject_10():
 
     st.write("")
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-    metric_1.metric("EEG Epochs", "8,540")
+    metric_1.metric("Data Distribution", "8,540")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
     metric_4.metric("Total Features", "56")
