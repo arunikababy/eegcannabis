@@ -80,6 +80,14 @@ SELECTED_FEATURES_DATA = pd.DataFrame(
         "Domain",
     ],
 )
+CONFUSION_MATRIX_IMAGES = {
+    "Gamma": "assets/confusion_matrix/gamma_confusion_matrix.png",
+    "Beta": "assets/confusion_matrix/beta_confusion_matrix.png",
+    "Alpha": "assets/confusion_matrix/alpha_confusion_matrix.png",
+    "Theta": "assets/confusion_matrix/theta_confusion_matrix.png",
+    "Delta": "assets/confusion_matrix/delta_confusion_matrix.png",
+    "All Bands": "assets/confusion_matrix/all_bands_confusion_matrix.png",
+}
 
 
 CUSTOM_CSS = """<style>
