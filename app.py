@@ -746,3 +746,121 @@ def render_subject_02():
         display_results = selected_results.copy()
 
         display_results["Training Accuracy"] = display_results[
+            "Training Accuracy"
+        ].map(lambda value: f"{value:.2%}")
+
+        display_results["Test Accuracy"] = display_results[
+            "Test Accuracy"
+        ].map(lambda value: f"{value:.2%}")
+
+        st.dataframe(
+            display_results,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        best_result = selected_results.loc[
+            selected_results["Test Accuracy"].idxmax()
+        ]
+
+        st.success(
+            f"Best test result for {selected_band}: "
+            f"{best_result['Classifier']} with "
+            f"{best_result['Test Accuracy']:.2%} accuracy."
+        )
+
+        with st.container(border=True):
+            st.subheader("Confusion matrix")
+            st.write(
+                "Confusion-matrix images or arrays can be added later "
+                "when the original output files are available."
+            )
+
+
+def render_empty_report(subject_name, report_number, user_count):
+    st.caption(f"EXPERIMENTAL REPORT {report_number}")
+    st.title(f"{subject_name}: BCM vs ACM")
+
+    st.write(
+        f"This multi-subject cannabis EEG report is prepared for a comparative "
+        f"analysis across {user_count} users, focusing on BCM and ACM conditions."
+    )
+
+    st.write(
+        "The dashboard structure is ready. Dataset information, preprocessing "
+        "outputs, feature extraction, ACGAN training, model evaluation, and "
+        "classification results will be added after the data-processing workflow "
+        "is completed."
+    )
+
+    if st.button(
+        "Back to all reports",
+        key=f"back_{subject_name}",
+    ):
+        return_to_home()
+
+    st.write("")
+
+    overview_tab, dataset_tab, models_tab, results_tab = st.tabs(
+        [
+            "Overview",
+            "Dataset",
+            "Models",
+            "Results",
+        ]
+    )
+
+    with overview_tab:
+        with st.container(border=True):
+            st.subheader("Report introduction")
+            st.write(
+                f"This section will provide the research objective and "
+                f"experimental workflow for the {user_count}-user study."
+            )
+
+    with dataset_tab:
+        with st.container(border=True):
+            st.subheader("Dataset status")
+            st.write(
+                "Dataset files have not been added yet. "
+                "The BCM and ACM EEG data will appear here."
+            )
+
+    with models_tab:
+        with st.container(border=True):
+            st.subheader("Model status")
+            st.write(
+                "Baseline model configuration and ACGAN augmentation "
+                "results will be added here."
+            )
+
+    with results_tab:
+        with st.container(border=True):
+            st.subheader("Results status")
+            st.write(
+                "Accuracy metrics, training curves, confusion matrices, "
+                "and classification reports will be added here."
+            )
+
+
+current_report = st.query_params.get("report", "home")
+
+if current_report == "subject_02":
+    render_subject_02()
+
+elif current_report == "subject_10":
+    render_empty_report(
+        subject_name="Subject 10",
+        report_number="02",
+        user_count="10",
+    )
+
+elif current_report == "subject_30":
+    render_empty_report(
+        subject_name="Subject 30",
+        report_number="03",
+        user_count="30",
+    )
+
+else:
+    render_landing_page()
