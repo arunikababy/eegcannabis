@@ -635,28 +635,69 @@ def render_subject_02():
                 st.write(description)
 
     with feature_tab:
-        st.subheader("Feature extraction methods")
+    st.subheader("Selected Feature Sets")
 
-        st.dataframe(
-            FEATURES_DATA,
-            use_container_width=True,
-            hide_index=True,
+    st.caption(
+        "Selected features for the All Bands classification experiment."
+    )
+
+    selected_features_styled = SELECTED_FEATURES_DATA.style.apply(
+        lambda row: (
+            [
+                "background-color: #EAF5ED; font-weight: 700; color: #1F6B35"
+                for _ in row
+            ]
+            if row["Feature"] == "Total"
+            else ["" for _ in row]
+        ),
+        axis=1,
+    )
+
+    st.dataframe(
+        selected_features_styled,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Number of Features": st.column_config.NumberColumn(
+                format="%d"
+            ),
+        },
+    )
+
+    st.write("")
+
+    st.subheader("All Feature Extraction Methods")
+
+    st.caption(
+        "Complete feature extraction methods available in the EEG processing workflow."
+    )
+
+    st.dataframe(
+        FEATURES_DATA,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.write("")
+
+    with st.container(border=True):
+        st.subheader("Feature groups")
+
+        st.write(
+            "Time-domain features include Hjorth Parameters, "
+            "Zero Crossing Rate, and Root Mean Square."
         )
 
-        with st.container(border=True):
-            st.subheader("Feature groups")
-            st.write(
-                "Time-domain features include Hjorth Parameters, "
-                "Zero Crossing Rate, and Root Mean Square."
-            )
-            st.write(
-                "Frequency-domain features include Band Power, Relative Power, "
-                "Spectral Flux, and Spectral Ratio."
-            )
-            st.write(
-                "Time-frequency features include Entropy, "
-                "Discrete Wavelet Transform, and Wavelet Packet."
-            )
+        st.write(
+            "Frequency-domain features include Band Power, Relative Power, "
+            "Spectral Flux, and Spectral Ratio."
+        )
+
+        st.write(
+            "Time-frequency features include Entropy, "
+            "Discrete Wavelet Transform, and Wavelet Packet."
+        )
+
 
     with models_tab:
         st.subheader("Baseline classifiers")
