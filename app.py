@@ -190,6 +190,40 @@ FEATURES_DATA = pd.DataFrame(
     ]
 )
 
+SELECTED_FEATURES_DATA = pd.DataFrame(
+    [
+        {
+            "Feature": "Band Power",
+            "Code": "BP",
+            "Number of Features": 20,
+            "Domain": "Frequency",
+        },
+        {
+            "Feature": "Relative Power",
+            "Code": "RP",
+            "Number of Features": 20,
+            "Domain": "Frequency",
+        },
+        {
+            "Feature": "Entropy",
+            "Code": "EN",
+            "Number of Features": 4,
+            "Domain": "Time-Frequency",
+        },
+        {
+            "Feature": "Hjorth Parameters",
+            "Code": "HJ",
+            "Number of Features": 12,
+            "Domain": "Time",
+        },
+        {
+            "Feature": "Total",
+            "Code": "-",
+            "Number of Features": 56,
+            "Domain": "-",
+        },
+    ]
+)
 
 CUSTOM_CSS = """<style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
