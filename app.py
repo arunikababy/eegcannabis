@@ -340,8 +340,8 @@ def render_landing_page():
         "<span class='title-green'>Portal</span>"
         "</h1>"
         "<p class='hero-description'>"
-        "Deep Generative Modeling for Cannabis Classification Using "
-        "Auxiliary Classifier Generative Adversarial Network (ACGAN)"
+        "Deep Generative Modeling for Cannabis Classification"
+        ""
         "</p><div class='hero-line'></div></div>"
     )
     st.markdown(hero_html, unsafe_allow_html=True)
