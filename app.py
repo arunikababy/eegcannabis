@@ -780,11 +780,22 @@ def render_subject_02():
         )
 
         with st.container(border=True):
-            st.subheader("Confusion matrix")
-            st.write(
-                "Confusion-matrix images or arrays can be added later "
-                "when the original output files are available."
-            )
+    st.subheader("Confusion Matrix")
+
+    image_path = Path(CONFUSION_MATRIX_IMAGES[selected_band])
+
+    if image_path.exists():
+        st.image(
+            str(image_path),
+            caption=f"Confusion Matrix, {selected_band}, Subject 02",
+            use_container_width=True,
+        )
+    else:
+        st.warning(
+            f"Image for {selected_band} has not been found. "
+            f"Check this file path: {image_path}"
+        )
+
 
 
 def render_empty_report(subject_name, report_number, user_count):
