@@ -200,8 +200,9 @@ CUSTOM_CSS = """<style>
 
 .stApp {
     background:
-        radial-gradient(circle at 100% 0%, #edf8ef 0%, transparent 27%),
-        #ffffff;
+        radial-gradient(circle at 12% 15%, rgba(157, 215, 168, 0.45), transparent 25%),
+        radial-gradient(circle at 88% 10%, rgba(215, 241, 220, 0.70), transparent 30%),
+        linear-gradient(135deg, #f7fcf8 0%, #eef8f0 45%, #ffffff 100%);
 }
 
 header[data-testid="stHeader"] {
