@@ -296,18 +296,29 @@ h2, h3 {
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+
+    border: 1px solid rgba(255, 255, 255, 0.75);
     border-radius: 20px;
-    border: 1px solid #dbe7de;
-    background: #ffffff;
-    box-shadow: 0 10px 28px rgba(31, 70, 42, 0.07);
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+
+    box-shadow:
+        0 10px 30px rgba(31, 107, 53, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+    transition: all 0.25s ease;
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-6px);
-    border-color: #1f6b35;
-    box-shadow: 0 18px 38px rgba(31, 107, 53, 0.15);
+    border-color: rgba(31, 107, 53, 0.45);
+
+    box-shadow:
+        0 18px 38px rgba(31, 107, 53, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.70);
 }
+
 
 div[data-testid="stMetric"] {
     border: 1px solid #dbe7de;
