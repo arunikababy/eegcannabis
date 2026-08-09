@@ -398,7 +398,7 @@ def render_landing_page():
         "<span class='title-green'>Portal</span>"
         "</h1>"
         "<p class='hero-description'>"
-        "Artificial Intelligence for cannabis classification using "
+        "Deep Generative for cannabis classification using "
         "Auxiliary Classifier Generative Adversarial Network."
         "</p>"
         "<div class='hero-line'></div>"
