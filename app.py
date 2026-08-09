@@ -513,8 +513,8 @@ def render_subject_02():
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
     metric_1.metric("EEG Epochs", "2,488")
     metric_2.metric("EEG Channels", "4")
-    metric_3.metric("Feature Methods", "10")
-    metric_4.metric("Total Features", "208")
+    metric_3.metric("Feature Methods", "4")
+    metric_4.metric("Total Features", "56")
 
     (
         overview_tab,
