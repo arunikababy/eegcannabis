@@ -30,9 +30,9 @@ RESULTS_DATA = pd.DataFrame(
         ("Delta", "SVM", 0.8388, 0.8249),
         ("Delta", "Random Forest", 0.8414, 0.7914),
         ("Delta", "1D CNN", 0.8563, 0.8075),
-        ("All Bands", "SVM", 0.8736, 0.8316),
-        ("All Bands", "Random Forest", 0.9057, 0.8168),
-        ("All Bands", "1D CNN", 0.8727, 0.8035),
+        ("All Bands", "SVM", 0.8739, 0.8329),
+        ("All Bands", "Random Forest", 0.8158, 0.8008),
+        ("All Bands", "1D CNN", 0.7931, 0.7928),
     ],
     columns=["Band", "Classifier", "Training Accuracy", "Test Accuracy"],
 )
