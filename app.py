@@ -362,7 +362,7 @@ def render_landing_page():
             "Subject 02",
             "Single-subject cannabis EEG classification with preprocessing, feature extraction, "
             "ACGAN augmentation, and model evaluation.",
-            "2,488 EEG Epochs",
+            "2,488 EEG Segment",
             "Explore Report",
             "subject_02",
         )
@@ -462,7 +462,7 @@ def render_subject_02():
 
     st.write("")
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-    metric_1.metric("EEG Epochs", "2,488")
+    metric_1.metric("EEG Segment", "2,488")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
     metric_4.metric("Total Features", "56")
@@ -617,7 +617,7 @@ def render_subject_10_completed_comparison(
 ):
     """Render a completed 10-subject comparison using a shared dashboard layout."""
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-    metric_1.metric("EEG Epochs", f"{total_epochs:,}")
+    metric_1.metric("EEG Segment", f"{total_epochs:,}")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
     metric_4.metric("Total Features", "56")
@@ -739,7 +739,7 @@ def render_subject_10_completed_comparison(
 def render_subject_10_bcf_acf():
     """Render the completed BCF vs ACF dashboard for the 10-subject study."""
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-    metric_1.metric("EEG Epochs", "8,540")
+    metric_1.metric("EEG Segment", "8,540")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
     metric_4.metric("Total Features", "56")
