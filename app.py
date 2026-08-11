@@ -493,7 +493,7 @@ def render_subject_02():
         left_column, right_column = st.columns(2)
         with left_column:
             with st.container(border=True):
-                st.subheader("Research objective")
+                st.subheader("About")
                 st.write("Classify cannabis EEG conditions before and after treatment using machine-learning and deep-learning models.")
         with right_column:
             with st.container(border=True):
@@ -694,7 +694,7 @@ def render_subject_10_completed_comparison(
         left_column, right_column = st.columns(2)
         with left_column:
             with st.container(border=True):
-                st.subheader("Research objective")
+                st.subheader("About")
                 st.write(
                     f"Compare the {comparison_name} multi-subject cannabis EEG conditions "
                     "using machine-learning and deep-learning models."
@@ -816,7 +816,7 @@ def render_subject_10_bcf_acf():
         left_column, right_column = st.columns(2)
         with left_column:
             with st.container(border=True):
-                st.subheader("Research objective")
+                st.subheader("About")
                 st.write(
                     "Compare multi-subject cannabis EEG conditions before and after cannabis "
                     "consumption using machine-learning and deep-learning models."
@@ -984,7 +984,7 @@ def render_empty_report(subject_name, report_number, user_count):
     with overview_tab:
         with st.container(border=True):
             st.subheader("Report introduction")
-            st.write(f"This section will provide the research objective and experimental workflow for the {user_count}-user study.")
+            st.write(f"This section will provide about experimental workflow for the {user_count}-user study.")
     with dataset_tab:
         with st.container(border=True):
             st.subheader("Dataset status")
