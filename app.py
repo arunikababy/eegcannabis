@@ -489,8 +489,8 @@ def render_subject_02():
     with dataset_tab:
         st.subheader("Dataset summary")
         dataset_1, dataset_2, dataset_3 = st.columns(3)
-        dataset_1.metric("Before Condition", "1,244 epochs")
-        dataset_2.metric("After Condition", "1,244 epochs")
+        dataset_1.metric("Before Condition", "1,244")
+        dataset_2.metric("After Condition", "1,244")
         dataset_3.metric("Epoch Shape", "(512, 4)")
         conditions = pd.DataFrame(
             {
@@ -772,8 +772,8 @@ def render_subject_10_bcf_acf():
     with dataset_tab:
         st.subheader("Dataset summary")
         dataset_1, dataset_2, dataset_3 = st.columns(3)
-        dataset_1.metric("Before Condition", "4,270 epochs")
-        dataset_2.metric("After Condition", "4,270 epochs")
+        dataset_1.metric("Before Condition", "4,270")
+        dataset_2.metric("After Condition", "4,270")
         dataset_3.metric("Epoch Shape", "(512, 4)")
         conditions = pd.DataFrame(
             {
