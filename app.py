@@ -194,29 +194,46 @@ SUBJECT_10_BCM_ACM_TRAIN_RESULTS = pd.DataFrame(
 # ---------------------------------------------------------------------------
 # BM vs AM
 # ---------------------------------------------------------------------------
-# Flip SUBJECT_10_BM_AM_READY to True only after every value below has been
-# replaced with the real experimental output. While it stays False the app
-# renders a pending panel instead of publishing placeholder numbers.
-SUBJECT_10_BM_AM_READY = False
+# BM vs AM values supplied in the 10-subject landing-page document.
+SUBJECT_10_BM_AM_READY = True
+SUBJECT_10_BM_AM_TOTAL_EPOCHS = 7440
+SUBJECT_10_BM_AM_CONDITION_EPOCHS = 3720
 
-# Total epochs across both conditions. Per-condition count is half of this.
-SUBJECT_10_BM_AM_TOTAL_EPOCHS = 0
+SUBJECT_10_BM_AM_SPLIT = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Samples": [5208, 1116, 1116],
+        "Percentage": ["70%", "15%", "15%"],
+    }
+)
+
+SUBJECT_10_BM_AM_ACGAN = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Real Samples": [5208, 1116, 1116],
+        "Synthetic Samples": [5208, 1116, 1116],
+        "Augmented Samples": [10416, 2232, 2232],
+    }
+)
 
 SUBJECT_10_BM_AM_TEST_RESULTS = pd.DataFrame(
     [
-        # (Ranking, Band, Model, Data, Accuracy)
-        # (1, "Gamma", "SVM", "Real + Synthetic", 0.000000),
-        # (2, "Delta", "SVM", "Real + Synthetic", 0.000000),
-        # (3, "Beta", "1D CNN", "Real + Synthetic", 0.000000),
-        # (4, "Alpha", "SVM", "Real + Synthetic", 0.000000),
-        # (5, "Theta", "1D CNN", "Real + Synthetic", 0.000000),
+        (1, "Gamma", "SVM", "Real + Synthetic", 0.824074),
+        (2, "Delta", "1D CNN", "Real + Synthetic", 0.821296),
+        (2, "Theta", "1D CNN", "Real + Synthetic", 0.821296),
+        (4, "Delta", "SVM", "Real + Synthetic", 0.820370),
+        (5, "Alpha", "SVM", "Real + Synthetic", 0.817593),
     ],
     columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
 )
 
 SUBJECT_10_BM_AM_TRAIN_RESULTS = pd.DataFrame(
     [
-        # (Ranking, Band, Model, Data, Accuracy)
+        (1, "Theta", "1D CNN", "Real + Synthetic", 0.876786),
+        (2, "Alpha", "SVM", "Real + Synthetic", 0.867262),
+        (3, "Gamma", "SVM", "Real + Synthetic", 0.859325),
+        (4, "Theta", "SVM", "Real + Synthetic", 0.853571),
+        (5, "Delta", "SVM", "Real + Synthetic", 0.851984),
     ],
     columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
 )
@@ -301,21 +318,17 @@ SUBJECT_10_CONCLUSIONS = {
             "generalizes robustly beyond the present dataset."
         ),
     },
-    # Replace the placeholder text below with the real BM vs AM findings before
-    # setting SUBJECT_10_BM_AM_READY to True.
     "BM vs AM": {
-        "best_result": (
-            "Replace this line with the highest Real + Synthetic test accuracy, "
-            "naming the frequency band and the model."
-        ),
+        "best_result": "Gamma-band SVM achieved the highest Real + Synthetic test accuracy at 82.41%.",
         "summary": (
-            "The 10-subject BM versus AM analysis shows that the 56-feature representation "
-            "derived from four EEG channels can support two-class classification within the "
-            "ACGAN-augmented dataset."
+            "The 10-subject BM versus AM dataset contains 7,440 EEG segments, evenly divided "
+            "between BM and AM. The classification workflow uses 56 features derived from "
+            "four EEG channels and ACGAN-based data augmentation."
         ),
         "interpretation": (
-            "Replace this line with the observed band ranking and state whether the margins "
-            "between the top configurations are wide enough to claim model superiority."
+            "Gamma-band SVM produced the highest listed test accuracy. Delta-band and "
+            "Theta-band 1D CNN configurations followed closely at 82.13%, so the small "
+            "differences among the leading results do not establish clear model superiority."
         ),
         "next_step": (
             "Validate the model using real-only unseen EEG data before concluding that performance "
@@ -1027,17 +1040,17 @@ def render_subject_10_all_conditions():
                 "Status": "Completed" if SUBJECT_10_BM_AM_READY else "Pending",
                 "EEG Segments": SUBJECT_10_BM_AM_TOTAL_EPOCHS if SUBJECT_10_BM_AM_READY else pd.NA,
                 "Training": (
-                    int(build_split_table(SUBJECT_10_BM_AM_TOTAL_EPOCHS).loc[0, "Samples"])
+                    int(SUBJECT_10_BM_AM_SPLIT.loc[0, "Samples"])
                     if SUBJECT_10_BM_AM_READY
                     else pd.NA
                 ),
                 "Validation": (
-                    int(build_split_table(SUBJECT_10_BM_AM_TOTAL_EPOCHS).loc[1, "Samples"])
+                    int(SUBJECT_10_BM_AM_SPLIT.loc[1, "Samples"])
                     if SUBJECT_10_BM_AM_READY
                     else pd.NA
                 ),
                 "Test": (
-                    int(build_split_table(SUBJECT_10_BM_AM_TOTAL_EPOCHS).loc[2, "Samples"])
+                    int(SUBJECT_10_BM_AM_SPLIT.loc[2, "Samples"])
                     if SUBJECT_10_BM_AM_READY
                     else pd.NA
                 ),
@@ -1209,13 +1222,16 @@ def render_subject_10_all_conditions():
             },
         ]
         if SUBJECT_10_BM_AM_READY:
-            bm_am_acgan = build_acgan_table(SUBJECT_10_BM_AM_TOTAL_EPOCHS)
             quality_rows.append(
                 {
                     "Comparison": "BM vs AM",
-                    "Real Samples": int(bm_am_acgan["Real Samples"].sum()),
-                    "Synthetic Samples": int(bm_am_acgan["Synthetic Samples"].sum()),
-                    "Augmented Samples": int(bm_am_acgan["Augmented Samples"].sum()),
+                    "Real Samples": int(SUBJECT_10_BM_AM_ACGAN["Real Samples"].sum()),
+                    "Synthetic Samples": int(
+                        SUBJECT_10_BM_AM_ACGAN["Synthetic Samples"].sum()
+                    ),
+                    "Augmented Samples": int(
+                        SUBJECT_10_BM_AM_ACGAN["Augmented Samples"].sum()
+                    ),
                     "Status": "Completed",
                 }
             )
@@ -1454,6 +1470,15 @@ def render_subject_10_completed_comparison(
     acgan_data,
     test_results,
     train_results,
+    overview_title="About",
+    objective_text=None,
+    workflow_text=None,
+    channel_names=None,
+    include_random_forest=False,
+    model_section_title="Classification models",
+    acgan_metric_values=None,
+    augmentation_details=None,
+    dataset_count_column="Data Distribution",
 ):
     """Render a completed 10-subject comparison using a shared dashboard layout."""
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
@@ -1490,10 +1515,13 @@ def render_subject_10_completed_comparison(
         left_column, right_column = st.columns(2)
         with left_column:
             with st.container(border=True):
-                st.subheader("About")
+                st.subheader(overview_title)
                 st.write(
-                    f"Compare the {comparison_name} multi-subject cannabis EEG conditions "
-                    "using machine-learning and deep-learning models."
+                    objective_text
+                    or (
+                        f"Compare the {comparison_name} multi-subject cannabis EEG conditions "
+                        "using machine-learning and deep-learning models."
+                    )
                 )
         with right_column:
             with st.container(border=True):
@@ -1503,8 +1531,11 @@ def render_subject_10_completed_comparison(
         with st.container(border=True):
             st.subheader("Research workflow")
             st.write(
-                "Raw EEG data → preprocessing → feature extraction → baseline modelling → "
-                "ACGAN augmentation → final evaluation."
+                workflow_text
+                or (
+                    "Raw EEG data → preprocessing → feature extraction → baseline modelling → "
+                    "ACGAN augmentation → final evaluation."
+                )
             )
 
     with dataset_tab:
@@ -1517,13 +1548,20 @@ def render_subject_10_completed_comparison(
             {
                 "Condition": [condition_0, condition_1],
                 "Label": [0, 1],
-                "Data Distribution": [condition_epochs, condition_epochs],
+                dataset_count_column: [condition_epochs, condition_epochs],
                 "State": ["Before", "After"],
             }
         )
         st.dataframe(conditions, use_container_width=True, hide_index=True)
         st.subheader("EEG channels")
-        st.caption("The study uses 4 EEG channels. Add the channel names here once they are finalised.")
+        if channel_names:
+            channel_columns = st.columns(len(channel_names))
+            for column, channel_name in zip(channel_columns, channel_names):
+                column.metric("Channel", channel_name)
+        else:
+            st.caption(
+                "The study uses 4 EEG channels. Add the channel names here once they are finalised."
+            )
 
     with preprocessing_tab:
         render_preprocessing_tab()
@@ -1531,32 +1569,52 @@ def render_subject_10_completed_comparison(
         render_feature_tab()
 
     with models_tab:
-        st.subheader("Classification models")
-        model_1, model_2 = st.columns(2)
+        st.subheader(model_section_title)
+        model_columns = st.columns(3 if include_random_forest else 2)
+        model_1 = model_columns[0]
         with model_1:
             with st.container(border=True):
                 st.subheader("SVM")
-                st.write("Support Vector Machine evaluated with the combined real and synthetic dataset.")
-        with model_2:
+                st.write(
+                    "Support Vector Machine for supervised classification between Label 0 and Label 1."
+                )
+        if include_random_forest:
+            with model_columns[1]:
+                with st.container(border=True):
+                    st.subheader("Random Forest")
+                    st.write(
+                        "Ensemble tree classifier for identifying nonlinear relationships in EEG features."
+                    )
+            cnn_column = model_columns[2]
+        else:
+            cnn_column = model_columns[1]
+        with cnn_column:
             with st.container(border=True):
                 st.subheader("1D CNN")
-                st.write("One-dimensional convolutional neural network evaluated with the combined real and synthetic dataset.")
+                st.write(
+                    "Deep-learning classifier using one-dimensional convolution over feature sequences."
+                )
         st.write("")
         st.subheader("Dataset split")
         st.dataframe(split_data, use_container_width=True, hide_index=True)
 
     with acgan_tab:
         st.subheader("ACGAN-based data augmentation")
+        if acgan_metric_values is None:
+            acgan_metric_values = (total_epochs, total_epochs, total_epochs * 2)
+        real_metric, synthetic_metric, mixed_metric = acgan_metric_values
         acgan_1, acgan_2, acgan_3 = st.columns(3)
-        acgan_1.metric("Real Training Data", f"{total_epochs:,}")
-        acgan_2.metric("Synthetic Training Data", f"{total_epochs:,}")
-        acgan_3.metric("Mixed Training Data", f"{total_epochs * 2:,}")
+        acgan_1.metric("Real Training Data", f"{real_metric:,}")
+        acgan_2.metric("Synthetic Training Data", f"{synthetic_metric:,}")
+        acgan_3.metric("Mixed Training Data", f"{mixed_metric:,}")
         with st.container(border=True):
             st.subheader("Augmentation strategy")
-            st.write(
+            details = augmentation_details or [
                 "ACGAN generates a synthetic counterpart for each real sample. The real and "
                 "synthetic samples are then combined for the classification experiment."
-            )
+            ]
+            for detail in details:
+                st.write(detail)
         st.dataframe(acgan_data, use_container_width=True, hide_index=True)
 
     with results_tab:
@@ -1590,7 +1648,7 @@ def render_subject_10_pending_comparison(comparison_name, condition_0, condition
     values have been entered.
     """
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
-    metric_1.metric("EEG Segment", "TBD")
+    metric_1.metric("EEG Segment", f"{SUBJECT_10_BM_AM_TOTAL_EPOCHS:,}")
     metric_2.metric("EEG Channels", "4")
     metric_3.metric("Feature Methods", "4")
     metric_4.metric("Total Features", "56")
@@ -1875,11 +1933,31 @@ def render_subject_10():
             condition_0="BM",
             condition_1="AM",
             total_epochs=SUBJECT_10_BM_AM_TOTAL_EPOCHS,
-            condition_epochs=SUBJECT_10_BM_AM_TOTAL_EPOCHS // 2,
-            split_data=build_split_table(SUBJECT_10_BM_AM_TOTAL_EPOCHS),
-            acgan_data=build_acgan_table(SUBJECT_10_BM_AM_TOTAL_EPOCHS),
+            condition_epochs=SUBJECT_10_BM_AM_CONDITION_EPOCHS,
+            split_data=SUBJECT_10_BM_AM_SPLIT,
+            acgan_data=SUBJECT_10_BM_AM_ACGAN,
             test_results=SUBJECT_10_BM_AM_TEST_RESULTS,
             train_results=SUBJECT_10_BM_AM_TRAIN_RESULTS,
+            overview_title="Research objective",
+            objective_text=(
+                "Classify the BM and AM cannabis EEG conditions across 10 subjects using "
+                "machine-learning and deep-learning models."
+            ),
+            workflow_text=(
+                "Raw EEG data → preprocessing → epoch segmentation → feature extraction → "
+                "baseline modelling → ACGAN augmentation → final evaluation."
+            ),
+            channel_names=["RAW_TP9", "RAW_AF7", "RAW_AF8", "RAW_TP10"],
+            include_random_forest=True,
+            model_section_title="Baseline classifiers",
+            acgan_metric_values=(3720, 3720, 7440),
+            augmentation_details=[
+                "ACGAN generates synthetic data for each feature set. Real and synthetic "
+                "samples are combined for model training and evaluation.",
+                "Frequency-band feature sets contain 24 features, while the All Bands "
+                "feature set contains 56 features.",
+            ],
+            dataset_count_column="Epochs",
         )
     else:
         render_subject_10_pending_comparison(
