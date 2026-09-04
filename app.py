@@ -1938,13 +1938,13 @@ def render_subject_10():
             acgan_data=SUBJECT_10_BM_AM_ACGAN,
             test_results=SUBJECT_10_BM_AM_TEST_RESULTS,
             train_results=SUBJECT_10_BM_AM_TRAIN_RESULTS,
-            overview_title="Research objective",
+            overview_title="About",
             objective_text=(
-                "Classify the BM and AM cannabis EEG conditions across 10 subjects using "
+                "Compare BM vs AM multi-subject cannabis EEG conditions using "
                 "machine-learning and deep-learning models."
             ),
             workflow_text=(
-                "Raw EEG data → preprocessing → epoch segmentation → feature extraction → "
+                "Raw EEG data → preprocessing → feature extraction → "
                 "baseline modelling → ACGAN augmentation → final evaluation."
             ),
             channel_names=["RAW_TP9", "RAW_AF7", "RAW_AF8", "RAW_TP10"],
