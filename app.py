@@ -1950,7 +1950,7 @@ def render_subject_10():
             channel_names=["RAW_TP9", "RAW_AF7", "RAW_AF8", "RAW_TP10"],
             include_random_forest=True,
             model_section_title="Baseline classifiers",
-            acgan_metric_values=(3720, 3720, 7440),
+            acgan_metric_values=(7440, 7440, 10416),
             augmentation_details=[
                 "ACGAN generates synthetic data for each feature set. Real and synthetic "
                 "samples are combined for model training and evaluation.",
