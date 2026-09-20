@@ -1,0 +1,16129 @@
+from pathlib import Path
+from math import log
+from zipfile import BadZipFile, ZipFile
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import streamlit as st
+
+
+APP_DIRECTORY = Path(__file__).resolve().parent
+
+BCF_ACF_SUBJECT_LEVEL_FILES = [
+    APP_DIRECTORY / "subject_level_master_BCF_ACF.csv",
+    APP_DIRECTORY / "subject_level_master_BCF_ACF(1).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BCF_ACF.csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BCF_ACF(1).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BCF_ACF.csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BCF_ACF(1).csv",
+]
+
+BCF_ACF_BAND_ORDER = ["Gamma", "Beta", "Alpha", "Theta", "Delta"]
+BCF_ACF_CHANNEL_ORDER = ["TP9", "AF7", "AF8", "TP10"]
+
+BCF_ACF_DIRECTION_COLORS = {
+    "Increase": "#1F6B35",
+    "Decrease": "#D95F59",
+    "No Change": "#9CA3AF",
+}
+
+# Multicolor palette used only by the BCF-ACF Pre-Post tab.
+BCF_ACF_PREPOST_SUBJECT_COLORS = [
+    "#6C3FD1",  # purple
+    "#AEB8C8",  # soft grey-blue
+    "#FF7A00",  # orange
+    "#FF6B5E",  # coral
+    "#E84545",  # warm red
+    "#18B7A0",  # teal
+    "#2F80ED",  # blue
+    "#69D6A3",  # mint
+    "#F2C94C",  # yellow
+    "#F299B1",  # pink
+]
+
+BCF_ACF_PREPOST_CHANNEL_COLORS = {
+    "TP9": "#6C3FD1",
+    "AF7": "#FF7A00",
+    "AF8": "#18B7A0",
+    "TP10": "#2F80ED",
+}
+
+BCF_ACF_PREPOST_CHANNEL_FILLS = {
+    "TP9": "rgba(108,63,209,0.18)",
+    "AF7": "rgba(255,122,0,0.18)",
+    "AF8": "rgba(24,183,160,0.18)",
+    "TP10": "rgba(47,128,237,0.18)",
+}
+
+BCF_ACF_PREPOST_CONDITION_COLORS = {
+    "BCF": "#27465A",
+    "ACF": "#27465A",
+}
+
+BCF_ACF_PREPOST_DIRECTION_COLORS = {
+    "Increase": "#237A57",
+    "Decrease": "#9DD9AF",
+    "No Change": "#B7C4BF",
+}
+
+BCF_ACF_BAND_HIGHLIGHTS = {
+    "Gamma": (
+        "The clearest pattern was observed for Gamma Band Power at AF8, which "
+        "increased in 9 of 10 paired subjects. Its mean change was +66,320.41 "
+        "and its median change was +61,998.58."
+    ),
+    "Beta": (
+        "Beta Band Power at AF8 increased in 8 of 10 paired subjects, with a "
+        "mean change of +61,725.43 and a median change of +59,376.82. Beta "
+        "Relative Power at AF8 also increased in 7 of 10 subjects."
+    ),
+    "Alpha": (
+        "Alpha Band Power increased in 8 of 10 subjects at both AF8 and TP10. "
+        "Alpha Relative Power at AF8 also increased in 8 of 10 subjects."
+    ),
+    "Theta": (
+        "Theta Relative Power at TP9 decreased in 9 of 10 subjects. Theta Band "
+        "Power at TP9 decreased in 8 of 10 subjects, whereas it increased in "
+        "8 of 10 subjects at AF8 and TP10."
+    ),
+    "Delta": (
+        "Delta Relative Power decreased more often than it increased across all "
+        "four channels. Delta Band Power increased in 8 of 10 subjects at AF8 "
+        "but decreased in 7 of 10 subjects at TP9."
+    ),
+}
+
+
+BCF_ACF_PAIRED_STATISTICS_ZIPS = [
+    APP_DIRECTORY / "paired_statistics_master BCF ACF.zip",
+    APP_DIRECTORY / "paired_statistics_master_BCF_ACF.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master BCF ACF.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master_BCF_ACF.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master BCF ACF.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master_BCF_ACF.zip",
+]
+
+BCF_ACF_PAIRED_STATISTICS_DIRECTORIES = [
+    APP_DIRECTORY / "paired_statistics_master",
+    APP_DIRECTORY / "data" / "paired_statistics_master",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BCF_ACF_PAIRED_REQUIRED_COLUMNS = {
+    "channel",
+    "feature_band",
+    "feature_type",
+    "feature",
+    "n_subjects",
+    "mean_change",
+    "ci95_lower",
+    "ci95_upper",
+    "cohens_dz",
+    "effect_size_interpretation",
+    "t_statistic",
+    "p_ttest",
+    "wilcoxon_statistic",
+    "p_wilcoxon",
+    "p_fdr_ttest",
+    "p_fdr_wilcoxon",
+}
+
+BCF_ACF_TEST_OPTIONS = {
+    "Wilcoxon signed-rank": {
+        "p_column": "p_wilcoxon",
+        "q_column": "p_fdr_wilcoxon",
+        "statistic_column": "wilcoxon_statistic",
+    },
+    "Paired t-test": {
+        "p_column": "p_ttest",
+        "q_column": "p_fdr_ttest",
+        "statistic_column": "t_statistic",
+    },
+}
+
+
+BCF_ACF_SYNTHETIC_QUALITY_ZIPS = [
+    APP_DIRECTORY / "synthetic_quality_master BCF ACF.zip",
+    APP_DIRECTORY / "synthetic_quality_master_BCF_ACF.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BCF ACF.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master_BCF_ACF.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BCF ACF.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master_BCF_ACF.zip",
+]
+
+BCF_ACF_SYNTHETIC_QUALITY_DIRECTORIES = [
+    APP_DIRECTORY / "synthetic_quality_master",
+    APP_DIRECTORY / "data" / "synthetic_quality_master",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BCF_ACF_SYNTHETIC_REQUIRED_COLUMNS = {
+    "Condition",
+    "Label",
+    "Channel",
+    "Feature",
+    "Real_Mean",
+    "Synthetic_Mean",
+    "Real_SD",
+    "Synthetic_SD",
+    "Real_Median",
+    "Synthetic_Median",
+    "Real_IQR",
+    "Synthetic_IQR",
+    "Real_N",
+    "Synthetic_N",
+}
+
+BCF_ACF_SYNTHETIC_METRICS = {
+    "Mean": {
+        "real": "Real_Mean",
+        "synthetic": "Synthetic_Mean",
+        "difference": "Mean_Difference",
+        "absolute": "Abs_Mean_Difference",
+    },
+    "Standard deviation": {
+        "real": "Real_SD",
+        "synthetic": "Synthetic_SD",
+        "difference": "SD_Difference",
+        "absolute": "Abs_SD_Difference",
+    },
+    "Median": {
+        "real": "Real_Median",
+        "synthetic": "Synthetic_Median",
+        "difference": "Median_Difference",
+        "absolute": "Abs_Median_Difference",
+    },
+    "IQR": {
+        "real": "Real_IQR",
+        "synthetic": "Synthetic_IQR",
+        "difference": "IQR_Difference",
+        "absolute": "Abs_IQR_Difference",
+    },
+}
+
+BCF_ACF_SYNTHETIC_BAND_COLORS = {
+    "Gamma": "#6C3FD1",
+    "Beta": "#2F80ED",
+    "Alpha": "#FF7A00",
+    "Theta": "#18B7A0",
+    "Delta": "#69B88B",
+}
+
+
+BCF_ACF_SIMILARITY_ZIPS = [
+    APP_DIRECTORY / "similarity_master BCF ACF.zip",
+    APP_DIRECTORY / "similarity_master BCF ACF(1).zip",
+    APP_DIRECTORY / "similarity_master_BCF_ACF.zip",
+    APP_DIRECTORY / "data" / "similarity_master BCF ACF.zip",
+    APP_DIRECTORY / "data" / "similarity_master BCF ACF(1).zip",
+    APP_DIRECTORY / "data" / "similarity_master_BCF_ACF.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BCF ACF.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BCF ACF(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master_BCF_ACF.zip",
+]
+
+BCF_ACF_SIMILARITY_DIRECTORIES = [
+    APP_DIRECTORY / "similarity_master",
+    APP_DIRECTORY / "data" / "similarity_master",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BF_AF_SIMILARITY_ZIPS = [
+    APP_DIRECTORY / "similarity_master BF AF.zip",
+    APP_DIRECTORY / "similarity_master BF AF(1).zip",
+    APP_DIRECTORY / "similarity_master_BF_AF.zip",
+    APP_DIRECTORY / "data" / "similarity_master BF AF.zip",
+    APP_DIRECTORY / "data" / "similarity_master BF AF(1).zip",
+    APP_DIRECTORY / "data" / "similarity_master_BF_AF.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BF AF.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BF AF(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master_BF_AF.zip",
+]
+
+BF_AF_SIMILARITY_DIRECTORIES = [
+    APP_DIRECTORY / "similarity_master",
+    APP_DIRECTORY / "data" / "similarity_master",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BCM_ACM_SIMILARITY_ZIPS = [
+    APP_DIRECTORY / "similarity_master BCM ACM(1).zip",
+    APP_DIRECTORY / "similarity_master BCM ACM.zip",
+    APP_DIRECTORY / "similarity_master_BCM_ACM.zip",
+    APP_DIRECTORY / "data" / "similarity_master BCM ACM(1).zip",
+    APP_DIRECTORY / "data" / "similarity_master BCM ACM.zip",
+    APP_DIRECTORY / "data" / "similarity_master_BCM_ACM.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BCM ACM(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BCM ACM.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master_BCM_ACM.zip",
+]
+
+BCM_ACM_SIMILARITY_DIRECTORIES = [
+    APP_DIRECTORY / "similarity_master",
+    APP_DIRECTORY / "data" / "similarity_master",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BM_AM_SIMILARITY_ZIPS = [
+    APP_DIRECTORY / "similarity_master BM AM.zip",
+    APP_DIRECTORY / "similarity_master BM AM(1).zip",
+    APP_DIRECTORY / "similarity_master_BM_AM.zip",
+    APP_DIRECTORY / "data" / "similarity_master BM AM.zip",
+    APP_DIRECTORY / "data" / "similarity_master BM AM(1).zip",
+    APP_DIRECTORY / "data" / "similarity_master_BM_AM.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BM AM.zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master BM AM(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master_BM_AM.zip",
+]
+
+BM_AM_SIMILARITY_DIRECTORIES = [
+    APP_DIRECTORY / "similarity_master",
+    APP_DIRECTORY / "data" / "similarity_master",
+    APP_DIRECTORY / "assets" / "data" / "similarity_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BCF_ACF_SIMILARITY_REQUIRED_COLUMNS = {
+    "Condition",
+    "Channel",
+    "Feature",
+    "Real_Mean",
+    "Synthetic_Mean",
+    "Mean_Difference",
+    "Real_SD",
+    "Synthetic_SD",
+    "SD_Difference",
+    "Real_Median",
+    "Synthetic_Median",
+    "Median_Difference",
+    "Real_IQR",
+    "Synthetic_IQR",
+    "Correlation",
+    "RMSE",
+    "DTW",
+}
+
+BCF_ACF_SIMILARITY_METRICS = {
+    "Correlation": {
+        "column": "Correlation",
+        "direction": "higher",
+        "ideal": 1.0,
+        "format": ".3f",
+    },
+    "RMSE": {
+        "column": "RMSE",
+        "direction": "lower",
+        "ideal": 0.0,
+        "format": ".3f",
+    },
+    "DTW": {
+        "column": "DTW",
+        "direction": "lower",
+        "ideal": 0.0,
+        "format": ".4f",
+    },
+}
+
+
+BF_AF_SYNTHETIC_QUALITY_ZIPS = [
+    APP_DIRECTORY / "synthetic_quality_master BF AF.zip",
+    APP_DIRECTORY / "synthetic_quality_master BF AF(1).zip",
+    APP_DIRECTORY / "synthetic_quality_master_BF_AF.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BF AF.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BF AF(1).zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master_BF_AF.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BF AF.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BF AF(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master_BF_AF.zip",
+]
+
+BF_AF_SYNTHETIC_QUALITY_DIRECTORIES = [
+    APP_DIRECTORY / "synthetic_quality_master",
+    APP_DIRECTORY / "data" / "synthetic_quality_master",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BF_AF_SYNTHETIC_REQUIRED_COLUMNS = set(
+    BCF_ACF_SYNTHETIC_REQUIRED_COLUMNS
+)
+
+BF_AF_SYNTHETIC_METRICS = dict(BCF_ACF_SYNTHETIC_METRICS)
+
+
+BCM_ACM_SYNTHETIC_QUALITY_ZIPS = [
+    APP_DIRECTORY / "synthetic_quality_master BCM ACM.zip",
+    APP_DIRECTORY / "synthetic_quality_master BCM ACM(1).zip",
+    APP_DIRECTORY / "synthetic_quality_master_BCM_ACM.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BCM ACM.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BCM ACM(1).zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master_BCM_ACM.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BCM ACM.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BCM ACM(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master_BCM_ACM.zip",
+]
+
+BCM_ACM_SYNTHETIC_QUALITY_DIRECTORIES = [
+    APP_DIRECTORY / "synthetic_quality_master",
+    APP_DIRECTORY / "data" / "synthetic_quality_master",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BCM_ACM_SYNTHETIC_REQUIRED_COLUMNS = set(
+    BCF_ACF_SYNTHETIC_REQUIRED_COLUMNS
+)
+
+BCM_ACM_SYNTHETIC_METRICS = dict(BCF_ACF_SYNTHETIC_METRICS)
+
+
+BM_AM_SYNTHETIC_QUALITY_ZIPS = [
+    APP_DIRECTORY / "synthetic_quality_master BM AM.zip",
+    APP_DIRECTORY / "synthetic_quality_master BM AM(1).zip",
+    APP_DIRECTORY / "synthetic_quality_master_BM_AM.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BM AM.zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master BM AM(1).zip",
+    APP_DIRECTORY / "data" / "synthetic_quality_master_BM_AM.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BM AM.zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master BM AM(1).zip",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master_BM_AM.zip",
+]
+
+BM_AM_SYNTHETIC_QUALITY_DIRECTORIES = [
+    APP_DIRECTORY / "synthetic_quality_master",
+    APP_DIRECTORY / "data" / "synthetic_quality_master",
+    APP_DIRECTORY / "assets" / "data" / "synthetic_quality_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+BM_AM_SYNTHETIC_REQUIRED_COLUMNS = set(
+    BCF_ACF_SYNTHETIC_REQUIRED_COLUMNS
+)
+
+BM_AM_SYNTHETIC_METRICS = dict(BCF_ACF_SYNTHETIC_METRICS)
+
+
+BF_AF_PAIRED_STATISTICS_ZIPS = [
+    APP_DIRECTORY / "paired_statistics_master BF AF.zip",
+    APP_DIRECTORY / "paired_statistics_master_BF_AF.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master BF AF.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master_BF_AF.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master BF AF.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master_BF_AF.zip",
+]
+
+BF_AF_PAIRED_STATISTICS_DIRECTORIES = [
+    APP_DIRECTORY / "paired_statistics_master",
+    APP_DIRECTORY / "data" / "paired_statistics_master",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+
+BCM_ACM_PAIRED_STATISTICS_ZIPS = [
+    APP_DIRECTORY / "paired_statistics_master BCM ACM.zip",
+    APP_DIRECTORY / "paired_statistics_master_BCM_ACM.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master BCM ACM.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master_BCM_ACM.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master BCM ACM.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master_BCM_ACM.zip",
+]
+
+BCM_ACM_PAIRED_STATISTICS_DIRECTORIES = [
+    APP_DIRECTORY / "paired_statistics_master",
+    APP_DIRECTORY / "data" / "paired_statistics_master",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+
+BM_AM_PAIRED_STATISTICS_ZIPS = [
+    APP_DIRECTORY / "paired_statistics_master BM AM.zip",
+    APP_DIRECTORY / "paired_statistics_master_BM_AM.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master BM AM.zip",
+    APP_DIRECTORY / "data" / "paired_statistics_master_BM_AM.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master BM AM.zip",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master_BM_AM.zip",
+]
+
+BM_AM_PAIRED_STATISTICS_DIRECTORIES = [
+    APP_DIRECTORY / "paired_statistics_master",
+    APP_DIRECTORY / "data" / "paired_statistics_master",
+    APP_DIRECTORY / "assets" / "data" / "paired_statistics_master",
+    APP_DIRECTORY,
+    APP_DIRECTORY / "data",
+    APP_DIRECTORY / "assets" / "data",
+]
+
+
+BF_AF_SUBJECT_LEVEL_FILES = [
+    APP_DIRECTORY / "subject_level_master_BF_AF.csv",
+    APP_DIRECTORY / "subject_level_master_BF_AF(1).csv",
+    APP_DIRECTORY / "subject_level_master_BF_AF(2).csv",
+    APP_DIRECTORY / "subject_level_master_BF_AF(3).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BF_AF.csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BF_AF(1).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BF_AF(2).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BF_AF(3).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BF_AF.csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BF_AF(1).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BF_AF(2).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BF_AF(3).csv",
+]
+
+BF_AF_BAND_ORDER = ["Gamma", "Beta", "Alpha", "Theta", "Delta"]
+BF_AF_CHANNEL_ORDER = ["TP9", "AF7", "AF8", "TP10"]
+
+BF_AF_DIRECTION_COLORS = {
+    "Increase": "#1F6B35",
+    "Decrease": "#D95F59",
+    "No Change": "#9CA3AF",
+}
+
+BF_AF_BAND_HIGHLIGHTS = {
+    "Gamma": (
+        "Gamma Band Power accounted for most of the upward pattern. At AF7, "
+        "it increased in 8 of 10 paired subjects, with a mean change of "
+        "+49,068.67 and a median change of +16,044.08."
+    ),
+    "Beta": (
+        "At TP9, Beta Band Power increased in 7 of 10 paired subjects, while "
+        "Beta Relative Power decreased in 7 of 10 subjects. Absolute and "
+        "relative Beta power should therefore be interpreted separately."
+    ),
+    "Alpha": (
+        "Alpha Band Power at AF8 and Alpha Relative Power at TP10 each "
+        "increased in 7 of 10 paired subjects. The upward tendency occurred "
+        "in both absolute and relative Alpha measures."
+    ),
+    "Theta": (
+        "Theta Band Power at TP10 and Theta Relative Power at AF8 each "
+        "decreased in 8 of 10 paired subjects, contributing to the clearest "
+        "downward tendency among the five bands."
+    ),
+    "Delta": (
+        "Delta Band Power at AF8 decreased in 7 of 10 paired subjects. Its "
+        "positive mean change but negative median indicates that a small "
+        "number of large increases influenced the mean."
+    ),
+}
+
+
+BCM_ACM_SUBJECT_LEVEL_FILES = [
+    APP_DIRECTORY / "subject_level_master_BCM_ACM.csv",
+    APP_DIRECTORY / "subject_level_master_BCM_ACM(1).csv",
+    APP_DIRECTORY / "subject_level_master_BCM_ACM(2).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BCM_ACM.csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BCM_ACM(1).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BCM_ACM(2).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BCM_ACM.csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BCM_ACM(1).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BCM_ACM(2).csv",
+]
+
+BCM_ACM_BAND_ORDER = ["Gamma", "Beta", "Alpha", "Theta", "Delta"]
+BCM_ACM_CHANNEL_ORDER = ["TP9", "AF7", "AF8", "TP10"]
+
+BCM_ACM_DIRECTION_COLORS = {
+    "Increase": "#1F6B35",
+    "Decrease": "#D95F59",
+    "No Change": "#9CA3AF",
+}
+
+BCM_ACM_BAND_HIGHLIGHTS = {
+    "Gamma": (
+        "Gamma Band Power decreased in 6 of 10 paired subjects at each "
+        "channel. At TP9, the positive mean but negative median change "
+        "indicates that a small number of large increases influenced the mean."
+    ),
+    "Beta": (
+        "Beta Band Power decreased in 6 of 10 paired subjects at AF7, AF8, "
+        "and TP9. No channel-feature combination exceeded 60% directional "
+        "consistency."
+    ),
+    "Alpha": (
+        "Alpha Band Power at AF8 decreased in 8 of 10 paired subjects, with "
+        "a mean change of -2,287.77 and a median change of -4,028.63. Alpha "
+        "Relative Power at AF7 increased in 7 of 10 subjects."
+    ),
+    "Theta": (
+        "Theta Band Power decreased in 7 of 10 paired subjects at TP10 and "
+        "TP9, but increased in 7 of 10 subjects at AF7. This indicates a "
+        "channel-dependent response."
+    ),
+    "Delta": (
+        "Delta Relative Power at TP9 decreased in 8 of 10 paired subjects. "
+        "In contrast, Delta Relative Power at TP10 increased in 7 of 10 "
+        "subjects."
+    ),
+}
+
+
+BM_AM_SUBJECT_LEVEL_FILES = [
+    APP_DIRECTORY / "subject_level_master_BM_AM.csv",
+    APP_DIRECTORY / "subject_level_master_BM_AM(1).csv",
+    APP_DIRECTORY / "subject_level_master_BM_AM(2).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BM_AM.csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BM_AM(1).csv",
+    APP_DIRECTORY / "data" / "subject_level_master_BM_AM(2).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BM_AM.csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BM_AM(1).csv",
+    APP_DIRECTORY / "assets" / "data" / "subject_level_master_BM_AM(2).csv",
+]
+
+BM_AM_BAND_ORDER = ["Gamma", "Beta", "Alpha", "Theta", "Delta"]
+BM_AM_CHANNEL_ORDER = ["TP9", "AF7", "AF8", "TP10"]
+
+BM_AM_DIRECTION_COLORS = {
+    "Increase": "#1F6B35",
+    "Decrease": "#D95F59",
+    "No Change": "#9CA3AF",
+}
+
+BM_AM_BAND_HIGHLIGHTS = {
+    "Gamma": (
+        "Gamma Band Power decreased in 22 of 40 comparisons, whereas Gamma "
+        "Relative Power increased in 23 of 40. At TP9, Gamma Band Power "
+        "decreased in 7 of 10 subjects, with a mean change of -71,377.78 and "
+        "a median change of -20,624.21."
+    ),
+    "Beta": (
+        "Beta Band Power decreased in 23 of 40 comparisons, while Beta "
+        "Relative Power increased slightly more often than it decreased. At "
+        "TP10, Beta Band Power decreased in 8 of 10 subjects, with a mean "
+        "change of -91,136.93 and a median change of -16,187.59."
+    ),
+    "Alpha": (
+        "Alpha Band Power decreased in 25 of 40 comparisons. At TP9, it "
+        "decreased in 9 of 10 subjects, with a mean change of -37,793.02 and "
+        "a median change of -13,236.71. Alpha Relative Power at AF8 increased "
+        "in 8 of 10 subjects."
+    ),
+    "Theta": (
+        "Theta Band Power decreased in 23 of 40 comparisons, while Relative "
+        "Power was more balanced. Theta Relative Power at AF8 decreased in "
+        "7 of 10 subjects; its positive mean and negative median indicate that "
+        "a small number of larger increases influenced the mean."
+    ),
+    "Delta": (
+        "Delta Band Power decreased in 26 of 40 comparisons. At AF8, it "
+        "decreased in 9 of 10 subjects, with a mean change of -19,166.91 and "
+        "a median change of -5,746.71. Delta Relative Power at TP10 increased "
+        "in 8 of 10 subjects."
+    ),
+}
+
+
+def build_app_data_candidates(*filenames):
+    """Return supported app-local locations for one or more data filenames."""
+    directories = [
+        APP_DIRECTORY,
+        APP_DIRECTORY / "data",
+        APP_DIRECTORY / "assets" / "data",
+    ]
+    return [directory / filename for directory in directories for filename in filenames]
+
+
+ALL_CONDITIONS_SUBJECT_LEVEL_SOURCES = {
+    "BCF vs ACF": {
+        "before": "BCF",
+        "after": "ACF",
+        "candidates": build_app_data_candidates(
+            "subject_level_master BCF ACF(1).zip",
+            "subject_level_master BCF ACF.zip",
+            "subject_level_master_BCF_ACF(1).zip",
+            "subject_level_master_BCF_ACF.zip",
+        ),
+    },
+    "BF vs AF": {
+        "before": "BF",
+        "after": "AF",
+        "candidates": build_app_data_candidates(
+            "subject_level_master BF AF.zip",
+            "subject_level_master BF AF(1).zip",
+            "subject_level_master_BF_AF.zip",
+            "subject_level_master_BF_AF(1).zip",
+        ),
+    },
+    "BCM vs ACM": {
+        "before": "BCM",
+        "after": "ACM",
+        "candidates": build_app_data_candidates(
+            "subject_level_master_BCM_ACM(1).zip",
+            "subject_level_master_BCM_ACM.zip",
+            "subject_level_master BCM ACM(1).zip",
+            "subject_level_master BCM ACM.zip",
+        ),
+    },
+    "BM vs AM": {
+        "before": "BM",
+        "after": "AM",
+        "candidates": build_app_data_candidates(
+            "subject_level_master_BM_AM.zip",
+            "subject_level_master_BM_AM(1).zip",
+            "subject_level_master BM AM.zip",
+            "subject_level_master BM AM(1).zip",
+        ),
+    },
+}
+
+ALL_CONDITIONS_PAIRED_STATISTICS_SOURCES = {
+    "BCF vs ACF": {
+        "pair_token": "bcf_vs_acf",
+        "candidates": build_app_data_candidates(
+            "paired_statistics_master BCF ACF(1).zip",
+            "paired_statistics_master BCF ACF.zip",
+            "paired_statistics_master_BCF_ACF(1).zip",
+            "paired_statistics_master_BCF_ACF.zip",
+        ),
+    },
+    "BF vs AF": {
+        "pair_token": "bf_vs_af",
+        "candidates": build_app_data_candidates(
+            "paired_statistics_master BF AF(1).zip",
+            "paired_statistics_master BF AF.zip",
+            "paired_statistics_master_BF_AF(1).zip",
+            "paired_statistics_master_BF_AF.zip",
+        ),
+    },
+    "BCM vs ACM": {
+        "pair_token": "bcm_vs_acm",
+        "candidates": build_app_data_candidates(
+            "paired_statistics_master BCM ACM(1).zip",
+            "paired_statistics_master BCM ACM.zip",
+            "paired_statistics_master_BCM_ACM(1).zip",
+            "paired_statistics_master_BCM_ACM.zip",
+        ),
+    },
+    "BM vs AM": {
+        "pair_token": "bm_vs_am",
+        "candidates": build_app_data_candidates(
+            "paired_statistics_master BM AM(1).zip",
+            "paired_statistics_master BM AM.zip",
+            "paired_statistics_master_BM_AM(1).zip",
+            "paired_statistics_master_BM_AM.zip",
+        ),
+    },
+}
+
+ALL_CONDITIONS_COMPARISON_ORDER = [
+    "BCF vs ACF",
+    "BF vs AF",
+    "BCM vs ACM",
+    "BM vs AM",
+]
+
+ALL_CONDITIONS_COMPARISON_COLORS = {
+    "BCF vs ACF": "#4B5563",
+    "BF vs AF": "#FF8A65",
+    "BCM vs ACM": "#12A594",
+    "BM vs AM": "#2F80ED",
+}
+
+ALL_CONDITIONS_COMPARISON_SYMBOLS = {
+    "BCF vs ACF": "circle",
+    "BF vs AF": "diamond",
+    "BCM vs ACM": "square",
+    "BM vs AM": "triangle-up",
+}
+
+ALL_CONDITIONS_DIRECTION_COLORS = {
+    "Increase": "#237A57",
+    "Decrease": "#9DD9AF",
+    "No Change": "#B7C4BF",
+}
+
+ALL_CONDITIONS_BAND_ORDER = ["Gamma", "Beta", "Alpha", "Theta", "Delta"]
+ALL_CONDITIONS_CHANNEL_ORDER = ["TP9", "AF7", "AF8", "TP10"]
+
+TOPOMAP_BAND_ORDER = ["Alpha", "Beta", "Delta", "Gamma", "Theta"]
+TOPOMAP_CONDITION_IMAGE_PREFIX = {
+    "All bands": "01",
+    "Alpha": "04",
+    "Beta": "05",
+    "Delta": "06",
+    "Gamma": "07",
+    "Theta": "08",
+}
+TOPOMAP_DIFFERENCE_IMAGE_PREFIX = {
+    "All bands": "02",
+    "Alpha": "09",
+    "Beta": "10",
+    "Delta": "11",
+    "Gamma": "12",
+    "Theta": "13",
+}
+TOPOMAP_SOURCE_CONFIG = {
+    "BCF vs ACF": {
+        "before": "BCF",
+        "after": "ACF",
+        "candidates": build_app_data_candidates(
+            "topomap_BCF_ACF_results.zip",
+            "topomap BCF ACF results.zip",
+        ),
+    },
+    "BF vs AF": {
+        "before": "BF",
+        "after": "AF",
+        "candidates": build_app_data_candidates(
+            "topomap_BF_AF_results.zip",
+            "topomap BF AF results.zip",
+        ),
+    },
+    "BCM vs ACM": {
+        "before": "BCM",
+        "after": "ACM",
+        "candidates": build_app_data_candidates(
+            "topomap_BCM_ACM_results.zip",
+            "topomap BCM ACM results.zip",
+        ),
+    },
+    "BM vs AM": {
+        "before": "BM",
+        "after": "AM",
+        "candidates": build_app_data_candidates(
+            "topomap_BM_AM_results.zip",
+            "topomap BM AM results.zip",
+        ),
+    },
+}
+
+ALL_CONDITIONS_QUALITY_COMPONENTS = {
+    "Composite gap": {
+        "column": "Normalized_Composite_Gap",
+        "short_label": "Composite",
+        "axis_label": "Composite normalized gap",
+    },
+    "Mean gap": {
+        "column": "Normalized_Mean_Gap",
+        "short_label": "Mean",
+        "axis_label": "Mean gap (pooled SD units)",
+    },
+    "Standard-deviation gap": {
+        "column": "Normalized_SD_Gap",
+        "short_label": "SD",
+        "axis_label": "Absolute log SD ratio",
+    },
+    "Median gap": {
+        "column": "Normalized_Median_Gap",
+        "short_label": "Median",
+        "axis_label": "Median gap (pooled SD units)",
+    },
+    "IQR gap": {
+        "column": "Normalized_IQR_Gap",
+        "short_label": "IQR",
+        "axis_label": "Absolute log IQR ratio",
+    },
+}
+
+ALL_CONDITIONS_QUALITY_STATUS_ORDER = [
+    "Close match",
+    "Moderate gap",
+    "Review",
+]
+
+ALL_CONDITIONS_QUALITY_STATUS_COLORS = {
+    "Close match": "#2F8F6D",
+    "Moderate gap": "#E6B85C",
+    "Review": "#E9806E",
+}
+
+
+st.set_page_config(
+    page_title="Cannabis EEG Research Portal",
+    page_icon="C",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+
+RESULTS_DATA = pd.DataFrame(
+    [
+        ("Gamma", "SVM", 0.8491, 0.8195),
+        ("Gamma", "Random Forest", 0.8856, 0.7955),
+        ("Gamma", "1D CNN", 0.8371, 0.8088),
+        ("Beta", "SVM", 0.8578, 0.8168),
+        ("Beta", "Random Forest", 0.8876, 0.7794),
+        ("Beta", "1D CNN", 0.8667, 0.7901),
+        ("Alpha", "SVM", 0.8503, 0.8249),
+        ("Alpha", "Random Forest", 0.8779, 0.7901),
+        ("Alpha", "1D CNN", 0.8549, 0.7995),
+        ("Theta", "SVM", 0.8466, 0.8316),
+        ("Theta", "Random Forest", 0.8868, 0.8088),
+        ("Theta", "1D CNN", 0.8319, 0.8128),
+        ("Delta", "SVM", 0.8388, 0.8249),
+        ("Delta", "Random Forest", 0.8414, 0.7914),
+        ("Delta", "1D CNN", 0.8563, 0.8075),
+        ("All Bands", "SVM", 0.8736, 0.8316),
+        ("All Bands", "Random Forest", 0.9057, 0.8168),
+        ("All Bands", "1D CNN", 0.8727, 0.8035),
+    ],
+    columns=["Band", "Classifier", "Training Accuracy", "Test Accuracy"],
+)
+
+FEATURES_DATA = pd.DataFrame(
+    [
+        ("Band Power", "BP", 20, "Frequency"),
+        ("Relative Power", "RP", 20, "Frequency"),
+        ("Entropy", "EN", 4, "Time Frequency"),
+        ("Hjorth Parameters", "HJ", 12, "Time"),
+        ("Spectral Flux", "SF", 4, "Frequency"),
+        ("Spectral Ratio", "SR", 4, "Frequency"),
+        ("Discrete Wavelet Transform", "DWT", 72, "Time Frequency"),
+        ("Wavelet Packet", "WP", 64, "Time Frequency"),
+        ("Zero Crossing Rate", "ZCR", 4, "Time"),
+        ("Root Mean Square", "RMS", 4, "Time"),
+    ],
+    columns=["Feature", "Code", "Features", "Domain"],
+)
+
+SELECTED_FEATURES_DATA = pd.DataFrame(
+    [
+        ("Band Power", "BP", 20, "Frequency"),
+        ("Relative Power", "RP", 20, "Frequency"),
+        ("Entropy", "EN", 4, "Time-Frequency"),
+        ("Hjorth Parameters", "HJ", 12, "Time"),
+        ("Total", "-", 56, "-"),
+    ],
+    columns=["Feature", "Code", "Number of Features", "Domain"],
+)
+
+CONFUSION_MATRIX_IMAGES = {
+    "Gamma": "assets/confusion_matrix/gamma_confusion_matrix.png",
+    "Beta": "assets/confusion_matrix/beta_confusion_matrix.png",
+    "Alpha": "assets/confusion_matrix/alpha_confusion_matrix.png",
+    "Theta": "assets/confusion_matrix/theta_confusion_matrix.png",
+    "Delta": "assets/confusion_matrix/delta_confusion_matrix.png",
+    "All Bands": "assets/confusion_matrix/all_bands_confusion_matrix.png",
+}
+
+SUBJECT_10_SPLIT = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Samples": [5978, 1281, 1281],
+        "Percentage": ["70%", "15%", "15%"],
+    }
+)
+
+SUBJECT_10_ACGAN = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Real Samples": [5978, 1281, 1281],
+        "Synthetic Samples": [5978, 1281, 1281],
+        "Augmented Samples": [11956, 2562, 2562],
+    }
+)
+
+SUBJECT_10_TEST_RESULTS = pd.DataFrame(
+    [
+        (1, "Beta", "SVM", "Real + Synthetic", 0.846995),
+        (2, "Delta", "SVM", "Real + Synthetic", 0.843872),
+        (3, "Gamma", "SVM", "Real + Synthetic", 0.843091),
+        (4, "Alpha", "SVM", "Real + Synthetic", 0.842701),
+        (5, "Alpha", "1D CNN", "Real + Synthetic", 0.841530),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+SUBJECT_10_TRAIN_RESULTS = pd.DataFrame(
+    [
+        (1, "Beta", "1D CNN", "Real + Synthetic", 0.894446),
+        (2, "Delta", "1D CNN", "Real + Synthetic", 0.885330),
+        (3, "Gamma", "1D CNN", "Real + Synthetic", 0.883155),
+        (4, "Alpha", "1D CNN", "Real + Synthetic", 0.882988),
+        (5, "Theta", "1D CNN", "Real + Synthetic", 0.876798),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+
+SUBJECT_10_BF_AF_SPLIT = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Samples": [2520, 540, 540],
+        "Percentage": ["70%", "15%", "15%"],
+    }
+)
+
+SUBJECT_10_BF_AF_ACGAN = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Real Samples": [2520, 540, 540],
+        "Synthetic Samples": [2520, 540, 540],
+        "Augmented Samples": [5040, 1080, 1080],
+    }
+)
+
+SUBJECT_10_BF_AF_TEST_RESULTS = pd.DataFrame(
+    [
+        (1, "Gamma", "SVM", "Real + Synthetic", 0.824074),
+        (2, "Delta", "1D CNN", "Real + Synthetic", 0.821296),
+        (2, "Theta", "1D CNN", "Real + Synthetic", 0.821296),
+        (4, "Delta", "SVM", "Real + Synthetic", 0.820370),
+        (5, "Alpha", "SVM", "Real + Synthetic", 0.817593),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+SUBJECT_10_BF_AF_TRAIN_RESULTS = pd.DataFrame(
+    [
+        (1, "Theta", "1D CNN", "Real + Synthetic", 0.876786),
+        (2, "Alpha", "SVM", "Real + Synthetic", 0.867262),
+        (3, "Gamma", "SVM", "Real + Synthetic", 0.859325),
+        (4, "Theta", "SVM", "Real + Synthetic", 0.853571),
+        (5, "Delta", "SVM", "Real + Synthetic", 0.851984),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+SUBJECT_10_BCM_ACM_SPLIT = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Samples": [5754, 1233, 1233],
+        "Percentage": ["70%", "15%", "15%"],
+    }
+)
+
+SUBJECT_10_BCM_ACM_ACGAN = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Real Samples": [5754, 1233, 1233],
+        "Synthetic Samples": [5754, 1233, 1233],
+        "Augmented Samples": [11508, 2466, 2466],
+    }
+)
+
+SUBJECT_10_BCM_ACM_TEST_RESULTS = pd.DataFrame(
+    [
+        (1, "Gamma", "SVM", "Real + Synthetic", 0.836172),
+        (2, "Delta", "SVM", "Real + Synthetic", 0.831306),
+        (3, "Beta", "SVM", "Real + Synthetic", 0.830089),
+        (4, "Alpha", "SVM", "Real + Synthetic", 0.829684),
+        (5, "Delta", "1D CNN", "Real + Synthetic", 0.827251),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+SUBJECT_10_BCM_ACM_TRAIN_RESULTS = pd.DataFrame(
+    [
+        (1, "Gamma", "1D CNN", "Real + Synthetic", 0.870786),
+        (2, "Alpha", "SVM", "Real + Synthetic", 0.854884),
+        (3, "Gamma", "SVM", "Real + Synthetic", 0.853928),
+        (4, "Theta", "1D CNN", "Real + Synthetic", 0.848453),
+        (5, "Beta", "SVM", "Real + Synthetic", 0.847758),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+# ---------------------------------------------------------------------------
+# BM vs AM
+# ---------------------------------------------------------------------------
+# BM vs AM values supplied in the 10-subject landing-page document.
+SUBJECT_10_BM_AM_READY = True
+SUBJECT_10_BM_AM_TOTAL_EPOCHS = 7440
+SUBJECT_10_BM_AM_CONDITION_EPOCHS = 3720
+
+SUBJECT_10_BM_AM_SPLIT = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Samples": [5208, 1116, 1116],
+        "Percentage": ["70%", "15%", "15%"],
+    }
+)
+
+SUBJECT_10_BM_AM_ACGAN = pd.DataFrame(
+    {
+        "Dataset": ["Training", "Validation", "Test"],
+        "Real Samples": [5208, 1116, 1116],
+        "Synthetic Samples": [5208, 1116, 1116],
+        "Augmented Samples": [10416, 2232, 2232],
+    }
+)
+
+SUBJECT_10_BM_AM_TEST_RESULTS = pd.DataFrame(
+    [
+        (1, "Gamma", "SVM", "Real + Synthetic", 0.824074),
+        (2, "Delta", "1D CNN", "Real + Synthetic", 0.821296),
+        (2, "Theta", "1D CNN", "Real + Synthetic", 0.821296),
+        (4, "Delta", "SVM", "Real + Synthetic", 0.820370),
+        (5, "Alpha", "SVM", "Real + Synthetic", 0.817593),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+SUBJECT_10_BM_AM_TRAIN_RESULTS = pd.DataFrame(
+    [
+        (1, "Theta", "1D CNN", "Real + Synthetic", 0.876786),
+        (2, "Alpha", "SVM", "Real + Synthetic", 0.867262),
+        (3, "Gamma", "SVM", "Real + Synthetic", 0.859325),
+        (4, "Theta", "SVM", "Real + Synthetic", 0.853571),
+        (5, "Delta", "SVM", "Real + Synthetic", 0.851984),
+    ],
+    columns=["Ranking", "Band", "Model", "Data", "Accuracy"],
+)
+
+
+def build_split_table(total_epochs):
+    """Derive the 70/15/15 split from the total epoch count."""
+    holdout = round(total_epochs * 0.15)
+    training = total_epochs - (holdout * 2)
+    return pd.DataFrame(
+        {
+            "Dataset": ["Training", "Validation", "Test"],
+            "Samples": [training, holdout, holdout],
+            "Percentage": ["70%", "15%", "15%"],
+        }
+    )
+
+
+def build_acgan_table(total_epochs):
+    """Derive the ACGAN augmentation table from the total epoch count."""
+    holdout = round(total_epochs * 0.15)
+    training = total_epochs - (holdout * 2)
+    return pd.DataFrame(
+        {
+            "Dataset": ["Training", "Validation", "Test"],
+            "Real Samples": [training, holdout, holdout],
+            "Synthetic Samples": [training, holdout, holdout],
+            "Augmented Samples": [training * 2, holdout * 2, holdout * 2],
+        }
+    )
+
+
+SUBJECT_10_CONCLUSIONS = {
+    "BCF vs ACF": {
+        "best_result": "Beta-band SVM achieved the highest Real + Synthetic test accuracy at 84.70%.",
+        "summary": (
+            "The 10-subject BCF versus ACF analysis shows that the 56-feature representation "
+            "derived from four EEG channels can support two-class classification within the "
+            "ACGAN-augmented dataset."
+        ),
+        "interpretation": (
+            "Beta-band features showed the strongest discriminative performance in the current "
+            "pipeline, followed closely by Delta, Gamma, and Alpha SVM configurations. This should "
+            "be interpreted as performance within an augmented evaluation setting."
+        ),
+        "next_step": (
+            "Validate the model using real-only unseen EEG data before concluding that performance "
+            "generalizes robustly beyond the present dataset."
+        ),
+    },
+    "BF vs AF": {
+        "best_result": "Gamma-band SVM achieved the highest Real + Synthetic test accuracy at 82.41%.",
+        "summary": (
+            "The 10-subject BF versus AF analysis shows that the 56-feature representation "
+            "derived from four EEG channels can support two-class classification within the "
+            "ACGAN-augmented dataset."
+        ),
+        "interpretation": (
+            "Gamma-band SVM provided the strongest observed discriminative performance. However, "
+            "the Delta-band and Theta-band 1D CNN models were close behind at 82.13%, so the small "
+            "margins do not establish clear model superiority."
+        ),
+        "next_step": (
+            "Evaluate real-only unseen EEG data to determine whether the observed performance "
+            "generalizes beyond the augmented dataset."
+        ),
+    },
+    "BCM vs ACM": {
+        "best_result": "Gamma-band SVM achieved the highest Real + Synthetic test accuracy at 83.62%.",
+        "summary": (
+            "The 10-subject BCM versus ACM analysis shows that the 56-feature representation "
+            "derived from four EEG channels can support two-class classification within the "
+            "ACGAN-augmented dataset."
+        ),
+        "interpretation": (
+            "Gamma-band features showed the strongest discriminative performance in the current "
+            "pipeline, followed by Delta, Beta, and Alpha SVM configurations. This should be "
+            "interpreted as performance within an augmented evaluation setting."
+        ),
+        "next_step": (
+            "Validate the model using real-only unseen EEG data before concluding that performance "
+            "generalizes robustly beyond the present dataset."
+        ),
+    },
+    "BM vs AM": {
+        "best_result": "Gamma-band SVM achieved the highest Real + Synthetic test accuracy at 82.41%.",
+        "summary": (
+            "The 10-subject BM versus AM dataset contains 7,440 EEG segments, evenly divided "
+            "between BM and AM. The classification workflow uses 56 features derived from "
+            "four EEG channels and ACGAN-based data augmentation."
+        ),
+        "interpretation": (
+            "Gamma-band SVM produced the highest listed test accuracy. Delta-band and "
+            "Theta-band 1D CNN configurations followed closely at 82.13%, so the small "
+            "differences among the leading results do not establish clear model superiority."
+        ),
+        "next_step": (
+            "Validate the model using real-only unseen EEG data before concluding that performance "
+            "generalizes robustly beyond the present dataset."
+        ),
+    },
+}
+
+CUSTOM_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+* { font-family: "Manrope", sans-serif; }
+
+.stApp {
+    background:
+        radial-gradient(circle at 12% 15%, rgba(157, 215, 168, 0.45), transparent 25%),
+        radial-gradient(circle at 88% 10%, rgba(215, 241, 220, 0.70), transparent 30%),
+        linear-gradient(135deg, #f7fcf8 0%, #eef8f0 45%, #ffffff 100%);
+}
+
+header[data-testid="stHeader"] { background: transparent; }
+#MainMenu, footer { visibility: hidden; }
+
+.block-container {
+    max-width: 1180px;
+    padding-top: 2.4rem;
+    padding-bottom: 3.5rem;
+}
+
+.hero-center { text-align: center; padding: 2.2rem 1rem 2.5rem; }
+
+.report-label {
+    display: inline-block;
+    color: #1f6b35;
+    background: #eaf5ed;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+}
+
+h1.hero-title {
+    margin: 1.1rem 0 0.9rem;
+    font-size: clamp(2.2rem, 4.2vw, 3.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.07em;
+}
+
+.title-green { color: #1f6b35; }
+.title-black { color: #20252b; }
+
+.hero-description {
+    max-width: 980px;
+    margin: 0 auto;
+    color: #69736c;
+    font-size: 1rem;
+    line-height: 1.8;
+    text-align: center;
+}
+
+.hero-line {
+    width: 86px;
+    height: 4px;
+    border-radius: 99px;
+    margin: 1.7rem auto 0;
+    background: linear-gradient(90deg, #1f6b35, #9ad5a8);
+}
+
+.section-center { text-align: center; padding: 0.8rem 0 1rem; }
+.section-center h2 { margin: 0; color: #20252b; font-size: 1.45rem; font-weight: 750; }
+.section-center p { margin-top: 0.55rem; color: #69736c; font-size: 0.95rem; }
+
+h1 { color: #20252b; font-weight: 800; letter-spacing: -0.06em; }
+h2, h3 { color: #20252b; font-weight: 700; }
+
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(31, 107, 53, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    transition: all 0.25s ease;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    transform: translateY(-6px);
+    border-color: rgba(31, 107, 53, 0.45);
+    box-shadow: 0 18px 38px rgba(31, 107, 53, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.70);
+}
+
+div[data-testid="stMetric"] {
+    border: 1px solid #dbe7de;
+    border-radius: 16px;
+    padding: 18px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(31, 70, 42, 0.05);
+}
+
+div[data-testid="stMetricValue"] { color: #1f6b35; }
+
+div.stButton > button {
+    background: #1f6b35;
+    color: #ffffff;
+    border: 1px solid #1f6b35;
+    border-radius: 12px;
+    font-weight: 700;
+    min-height: 44px;
+}
+
+div.stButton > button:hover { background: #155126; border-color: #155126; color: #ffffff; }
+button[data-baseweb="tab"] { font-weight: 700; }
+button[data-baseweb="tab"][aria-selected="true"] { color: #1f6b35; }
+
+@media (max-width: 760px) {
+    .block-container { padding: 1.4rem 1rem 2.5rem; }
+}
+</style>
+"""
+
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+
+def open_report(report_name):
+    st.query_params["report"] = report_name
+    st.rerun()
+
+
+def return_to_home():
+    st.query_params.clear()
+    st.rerun()
+
+
+def render_report_card(label, title, description, tag, button_text, report_name):
+    with st.container(border=True):
+        st.caption(label)
+        st.subheader(title)
+        st.write(description)
+        st.caption(tag)
+        st.write("")
+        if st.button(button_text, key=f"button_{report_name}", use_container_width=True):
+            open_report(report_name)
+
+
+def render_landing_page():
+    hero_html = (
+        "<div class='hero-center'>"
+        "<div class='report-label'>REPORT</div>"
+        "<h1 class='hero-title'>"
+        "<span class='title-green'>Cannabis EEG</span> "
+        "<span class='title-black'>Classification</span><br>"
+        "<span class='title-black'>Research</span> "
+        "<span class='title-green'>Portal</span>"
+        "</h1>"
+        "<p class='hero-description'>"
+        "Deep Generative Modeling for Cannabis Classification Using "
+        "Auxiliary Classifier Generative Adversarial Network (ACGAN)"
+        "</p><div class='hero-line'></div></div>"
+    )
+    st.markdown(hero_html, unsafe_allow_html=True)
+    st.divider()
+
+    st.markdown(
+        "<div class='section-center'><h2>Choose one of the available reports</h2>"
+        "<p>Select an experimental scale to explore EEG processing, model development, "
+        "and classification results.</p></div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
+    first_column, second_column = st.columns(2)
+    with first_column:
+        render_report_card(
+            "EXPERIMENTAL REPORT 01",
+            "Subject 02",
+            "Single-subject cannabis EEG classification with preprocessing, feature extraction, "
+            "ACGAN augmentation, and model evaluation.",
+            "2,488 Data Distribution",
+            "Explore Report",
+            "subject_02",
+        )
+    with second_column:
+        render_report_card(
+            "EXPERIMENTAL REPORT 02",
+            "EEG Data Analysis of 10 Cannabis Subjects",
+            "Multi-subject cannabis EEG analysis across 10 users, including comparative "
+            "classification of BCF vs ACF, BF vs AF, and BCM vs ACM conditions.",
+            "3 Comparative Conditions",
+            "Explore Report",
+            "subject_10",
+        )
+
+    st.write("")
+    third_column, fourth_column = st.columns(2)
+    with third_column:
+        render_report_card(
+            "EXPERIMENTAL REPORT 03",
+            "Subject 30",
+            "Large-scale cannabis EEG analysis reserved for 30-user experiments, with expanded "
+            "preprocessing, ACGAN augmentation, and model evaluation.",
+            "COMING SOON",
+            "Explore Report",
+            "subject_30",
+        )
+    with fourth_column:
+        with st.container(border=True):
+            st.caption("EXPERIMENTAL REPORT 04")
+            st.subheader("Future Subject")
+            st.write(
+                "Reserved for future cannabis EEG experiments, additional participants, "
+                "and extended classification studies."
+            )
+            st.caption("COMING SOON")
+
+    st.write("")
+    st.caption("Cannabis EEG Classification Research Portal")
+
+
+def render_preprocessing_tab():
+    st.subheader("Preprocessing pipeline")
+    preprocessing_steps = [
+        ("Signal parsing", "Selecting four primary EEG channels from each input file."),
+        ("Missing-value handling", "Interpolating short NaN gaps in each EEG channel."),
+        ("Band-pass filtering", "Applying a frequency filter from 0.5 to 50 Hz."),
+        ("Artifact handling", "Applying clipping based on mean plus or minus 3 standard deviation."),
+        ("Epoch segmentation", "Dividing the EEG signal into epochs with 512 time points."),
+    ]
+    for index, (title, description) in enumerate(preprocessing_steps, start=1):
+        with st.container(border=True):
+            st.subheader(f"{index}. {title}")
+            st.write(description)
+
+
+def render_feature_tab():
+    st.subheader("Selected Feature Sets")
+    st.caption("Selected features for the All Bands classification experiment.")
+    selected_features_styled = SELECTED_FEATURES_DATA.style.apply(
+        lambda row: (
+            ["background-color: #EAF5ED; font-weight: 700; color: #1F6B35" for _ in row]
+            if row["Feature"] == "Total"
+            else ["" for _ in row]
+        ),
+        axis=1,
+    )
+    st.dataframe(
+        selected_features_styled,
+        use_container_width=True,
+        hide_index=True,
+        column_config={"Number of Features": st.column_config.NumberColumn(format="%d")},
+    )
+
+    st.write("")
+    st.subheader("All Feature Extraction Methods")
+    st.caption("Complete feature extraction methods available in the EEG processing workflow.")
+    st.dataframe(FEATURES_DATA, use_container_width=True, hide_index=True)
+
+    st.write("")
+    with st.container(border=True):
+        st.subheader("Feature groups")
+        st.write("Time-domain features include Hjorth Parameters, Zero Crossing Rate, and Root Mean Square.")
+        st.write("Frequency-domain features include Band Power, Relative Power, Spectral Flux, and Spectral Ratio.")
+        st.write("Time-frequency features include Entropy, Discrete Wavelet Transform, and Wavelet Packet.")
+
+
+def render_subject_02():
+    st.caption("EXPERIMENTAL REPORT 01")
+    st.title("Subject 02")
+    st.write(
+        "Single-subject cannabis EEG classification dashboard. This report compares "
+        "Before and After conditions using feature-based classification and ACGAN-based "
+        "data augmentation."
+    )
+    if st.button("Back to all reports", key="back_subject_02"):
+        return_to_home()
+
+    st.write("")
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("EEG Segment", "2,488")
+    metric_2.metric("EEG Channels", "4")
+    metric_3.metric("Feature Methods", "4")
+    metric_4.metric("Total Features", "56")
+
+    (
+        overview_tab,
+        dataset_tab,
+        preprocessing_tab,
+        feature_tab,
+        models_tab,
+        acgan_tab,
+        results_tab,
+        conclusion_tab,
+    ) = st.tabs(
+        [
+            "Overview",
+            "Dataset",
+            "Preprocessing",
+            "Feature Extraction",
+            "Baseline Models",
+            "ACGAN",
+            "Results",
+            "Conclusion",
+        ]
+    )
+
+    with overview_tab:
+        left_column, right_column = st.columns(2)
+        with left_column:
+            with st.container(border=True):
+                st.subheader("About")
+                st.write("Classify cannabis EEG conditions before and after treatment using machine-learning and deep-learning models.")
+        with right_column:
+            with st.container(border=True):
+                st.subheader("Classification labels")
+                st.write("Label 0: BCF, BCM, BF, and BM.")
+                st.write("Label 1: ACF, ACM, AF, and AM.")
+        with st.container(border=True):
+            st.subheader("Research workflow")
+            st.write("Raw EEG data → preprocessing → feature extraction → baseline modelling → ACGAN augmentation → final evaluation.")
+
+    with dataset_tab:
+        st.subheader("Dataset summary")
+        dataset_1, dataset_2, dataset_3 = st.columns(3)
+        dataset_1.metric("Before Condition", "1,244")
+        dataset_2.metric("After Condition", "1,244")
+        dataset_3.metric("Epoch Shape", "(512, 4)")
+        conditions = pd.DataFrame(
+            {
+                "Condition": ["BCF", "BCM", "BF", "BM", "ACF", "ACM", "AF", "AM"],
+                "Label": [0, 0, 0, 0, 1, 1, 1, 1],
+                "Data Distribution": [311, 311, 311, 311, 311, 311, 311, 311],
+                "State": ["Before", "Before", "Before", "Before", "After", "After", "After", "After"],
+            }
+        )
+        st.dataframe(conditions, use_container_width=True, hide_index=True)
+        st.subheader("EEG channels")
+        channel_1, channel_2, channel_3, channel_4 = st.columns(4)
+        channel_1.metric("Channel", "RAW_TP9")
+        channel_2.metric("Channel", "RAW_AF7")
+        channel_3.metric("Channel", "RAW_AF8")
+        channel_4.metric("Channel", "RAW_TP10")
+
+    with preprocessing_tab:
+        render_preprocessing_tab()
+    with feature_tab:
+        render_feature_tab()
+    with models_tab:
+        st.subheader("Baseline classifiers")
+        model_1, model_2, model_3 = st.columns(3)
+        with model_1:
+            with st.container(border=True):
+                st.subheader("SVM")
+                st.write("Support Vector Machine for supervised classification between Label 0 and Label 1.")
+        with model_2:
+            with st.container(border=True):
+                st.subheader("Random Forest")
+                st.write("Ensemble tree classifier for identifying nonlinear relationships in EEG features.")
+        with model_3:
+            with st.container(border=True):
+                st.subheader("1D CNN")
+                st.write("Deep-learning classifier using one-dimensional convolution over feature sequences.")
+        st.write("")
+        st.subheader("Dataset split")
+        st.dataframe(
+            pd.DataFrame(
+                {"Dataset": ["Training", "Validation", "Test"], "Samples": [1740, 374, 374], "Percentage": ["69.94%", "15.03%", "15.03%"]}
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with acgan_tab:
+        st.subheader("ACGAN-based data augmentation")
+        acgan_1, acgan_2, acgan_3 = st.columns(3)
+        acgan_1.metric("Real Training Data", "1,740")
+        acgan_2.metric("Synthetic Training Data", "1,740")
+        acgan_3.metric("Mixed Training Data", "3,480")
+        with st.container(border=True):
+            st.subheader("Augmentation strategy")
+            st.write("ACGAN generates synthetic data for each feature set. Real and synthetic samples are combined for model training and evaluation.")
+            st.write("Frequency-band feature sets contain 24 features, while the All Bands feature set contains 56 features.")
+        st.dataframe(
+            pd.DataFrame(
+                {"Dataset": ["Training", "Validation", "Test"], "Real Samples": [1740, 374, 374], "Synthetic Samples": [1740, 374, 374], "Augmented Samples": [3480, 748, 748]}
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with results_tab:
+        st.subheader("Classification performance")
+        selected_band = st.selectbox(
+            "Select frequency band",
+            options=["All Bands", "Gamma", "Beta", "Alpha", "Theta", "Delta"],
+            key="subject_02_band",
+        )
+        selected_results = RESULTS_DATA[RESULTS_DATA["Band"] == selected_band].copy()
+        chart_data = selected_results.melt(
+            id_vars="Classifier",
+            value_vars=["Training Accuracy", "Test Accuracy"],
+            var_name="Evaluation Set",
+            value_name="Accuracy",
+        )
+        figure = px.bar(
+            chart_data,
+            x="Classifier",
+            y="Accuracy",
+            color="Evaluation Set",
+            barmode="group",
+            text_auto=".2%",
+            color_discrete_map={"Training Accuracy": "#1F6B35", "Test Accuracy": "#8FCF9C"},
+        )
+        figure.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10),
+            plot_bgcolor="#FFFFFF",
+            paper_bgcolor="#FFFFFF",
+            legend_title_text="",
+            xaxis_title="",
+            yaxis_title="Accuracy",
+            yaxis=dict(range=[0, 1], tickformat=".0%"),
+        )
+        st.plotly_chart(figure, use_container_width=True)
+        display_results = selected_results.copy()
+        display_results["Training Accuracy"] = display_results["Training Accuracy"].map(lambda value: f"{value:.2%}")
+        display_results["Test Accuracy"] = display_results["Test Accuracy"].map(lambda value: f"{value:.2%}")
+        st.dataframe(display_results, use_container_width=True, hide_index=True)
+        best_result = selected_results.loc[selected_results["Test Accuracy"].idxmax()]
+        st.success(f"Best test result for {selected_band}: {best_result['Classifier']} with {best_result['Test Accuracy']:.2%} accuracy.")
+        with st.container(border=True):
+            st.subheader("Confusion Matrix")
+            image_path = Path(CONFUSION_MATRIX_IMAGES[selected_band])
+            if image_path.exists():
+                st.image(str(image_path), caption=f"Confusion Matrix, {selected_band}, Subject 02", use_container_width=True)
+            else:
+                st.warning(f"Image for {selected_band} has not been found. Check this file path: {image_path}")
+
+
+
+    with conclusion_tab:
+        st.subheader("Conclusion")
+
+        conclusion_left, conclusion_right = st.columns(2)
+        with conclusion_left:
+            with st.container(border=True):
+                st.subheader("Best-performing model")
+                st.write("SVM")
+                st.subheader("Best configuration")
+                st.write("All Bands")
+                st.subheader("Best single frequency band")
+                st.write("Theta")
+        with conclusion_right:
+            with st.container(border=True):
+                st.subheader("Augmented test accuracy")
+                st.metric("SVM All Bands", "83.29%")
+                st.metric("SVM Theta", "83.16%")
+                st.caption("Difference between All Bands and Theta: 0.13 percentage points.")
+
+        with st.container(border=True):
+            st.subheader("Interpretation")
+            st.write(
+                "The single-subject analysis indicates that cross-band EEG features can "
+                "support two-class classification within the augmented intra-subject dataset. "
+                "SVM achieved the highest accuracy across all configurations, with All Bands "
+                "reaching 83.29% and Theta reaching 83.16%."
+            )
+            st.write(
+                "Because the difference is only 0.13 percentage points, All Bands cannot be "
+                "considered conclusively superior to Theta without repeated validation. Theta "
+                "appears to capture most of the discriminative information for this subject."
+            )
+            st.write(
+                "These findings provide preliminary evidence of subject-specific decoding, not "
+                "generalizable performance on unseen individuals or newly acquired EEG data."
+            )
+
+        with st.container(border=True):
+            st.subheader("Future research")
+            st.write(
+                "Evaluate a larger and more heterogeneous cohort to determine whether the "
+                "observed feature patterns, SVM performance, and the benefit of ACGAN-based "
+                "augmentation remain consistent across individuals."
+            )
+
+def render_accuracy_chart(results_data, chart_title):
+    """Render a consistent Top 5 accuracy chart for a training or test dataset."""
+    st.subheader(chart_title)
+    chart = px.bar(
+        results_data,
+        x="Band",
+        y="Accuracy",
+        color="Model",
+        text="Accuracy",
+        color_discrete_map={"SVM": "#1F6B35", "1D CNN": "#8FCF9C"},
+    )
+    chart.update_traces(texttemplate="%{text:.2%}", textposition="outside")
+    chart.update_layout(
+        height=420,
+        margin=dict(l=10, r=10, t=30, b=10),
+        plot_bgcolor="#FFFFFF",
+        paper_bgcolor="#FFFFFF",
+        legend_title_text="",
+        xaxis_title="Frequency Band",
+        yaxis_title="Accuracy",
+        yaxis=dict(range=[0, 1], tickformat=".0%"),
+    )
+    st.plotly_chart(chart, use_container_width=True)
+
+
+def render_subject_10_conclusion(comparison_name):
+    """Render the conclusion that matches the selected 10-subject comparison."""
+    conclusion = SUBJECT_10_CONCLUSIONS[comparison_name]
+    st.subheader(f"Conclusion: {comparison_name}")
+
+    with st.container(border=True):
+        st.subheader("Key finding")
+        st.write(conclusion["best_result"])
+
+    with st.container(border=True):
+        st.subheader("Summary")
+        st.write(conclusion["summary"])
+        st.write(conclusion["interpretation"])
+
+    with st.container(border=True):
+        st.subheader("Next step")
+        st.write(conclusion["next_step"])
+
+
+def find_bcf_acf_subject_level_file():
+    """Return the first configured BCF vs ACF subject-level CSV that exists."""
+    for file_path in BCF_ACF_SUBJECT_LEVEL_FILES:
+        if file_path.exists():
+            return file_path
+    return None
+
+
+@st.cache_data
+def load_bcf_acf_subject_level():
+    """Load and validate the BCF vs ACF subject-level master table."""
+    file_path = find_bcf_acf_subject_level_file()
+    if file_path is None:
+        expected_locations = "\n".join(
+            f"- {path.relative_to(APP_DIRECTORY)}"
+            for path in BCF_ACF_SUBJECT_LEVEL_FILES
+        )
+        raise FileNotFoundError(
+            "subject_level_master_BCF_ACF.csv was not found. "
+            "Place the file in one of these locations:\n"
+            f"{expected_locations}"
+        )
+
+    dataframe = pd.read_csv(file_path)
+    required_columns = {
+        "Band",
+        "Subject",
+        "Channel",
+        "Feature_Type",
+        "Feature",
+        "BCF",
+        "ACF",
+    }
+    missing_columns = required_columns.difference(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            "The BCF vs ACF subject-level CSV is missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Channel"] = dataframe["Channel"].astype(str).str.strip().str.upper()
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Type"] = (
+        dataframe["Feature_Type"].astype(str).str.strip().str.upper()
+    )
+
+    for column in ["BCF", "ACF"]:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+
+    # Use ACF minus BCF as the reproducible change definition.
+    dataframe["Change"] = dataframe["ACF"] - dataframe["BCF"]
+    baseline = dataframe["BCF"].abs().replace(0, pd.NA)
+    dataframe["Change_Percent"] = dataframe["Change"] / baseline * 100
+
+    dataframe["Direction"] = dataframe["Change"].apply(
+        lambda value: (
+            "Missing"
+            if pd.isna(value)
+            else "Increase"
+            if value > 0
+            else "Decrease"
+            if value < 0
+            else "No Change"
+        )
+    )
+
+    return dataframe
+
+
+def format_bcf_acf_change(value):
+    """Format feature changes without hiding small relative-power values."""
+    if pd.isna(value):
+        return "N/A"
+    if abs(value) >= 1000:
+        return f"{value:+,.2f}"
+    if abs(value) >= 1:
+        return f"{value:+,.3f}"
+    return f"{value:+.4f}"
+
+
+def get_bcf_acf_band_summary(dataframe, band):
+    """Summarise BP and RP observations for one frequency band."""
+    band_data = dataframe[dataframe["Band"] == band]
+    band_specific = band_data[band_data["Feature_Type"].isin(["BP", "RP"])]
+
+    total = len(band_specific)
+    increased = int((band_specific["Direction"] == "Increase").sum())
+    decreased = int((band_specific["Direction"] == "Decrease").sum())
+    unchanged = int((band_specific["Direction"] == "No Change").sum())
+
+    increase_percentage = increased / total * 100 if total else 0.0
+    decrease_percentage = decreased / total * 100 if total else 0.0
+
+    if abs(increase_percentage - decrease_percentage) < 3:
+        tendency = "a nearly balanced pattern"
+    elif increased > decreased:
+        tendency = "an upward tendency"
+    else:
+        tendency = "a slight downward tendency"
+
+    summary_text = (
+        f"{band} showed {tendency}. {increased} of {total} band-specific "
+        f"comparisons increased ({increase_percentage:.1f}%), while {decreased} "
+        f"decreased ({decrease_percentage:.1f}%). "
+        f"{BCF_ACF_BAND_HIGHLIGHTS[band]}"
+    )
+
+    return {
+        "text": summary_text,
+        "total": total,
+        "increased": increased,
+        "decreased": decreased,
+        "unchanged": unchanged,
+        "increase_percentage": increase_percentage,
+        "decrease_percentage": decrease_percentage,
+    }
+
+
+def get_bcf_acf_selected_interpretation(selected, band, feature, channel):
+    """Create a concise interpretation for the selected paired plot."""
+    total = len(selected)
+    increased = int((selected["Direction"] == "Increase").sum())
+    decreased = int((selected["Direction"] == "Decrease").sum())
+    unchanged = int((selected["Direction"] == "No Change").sum())
+
+    mean_change = selected["Change"].mean()
+    median_change = selected["Change"].median()
+
+    if increased > decreased and increased > unchanged:
+        direction_text = (
+            f"{increased} of {total} paired subjects showed an increase in "
+            f"{feature} at {channel}."
+        )
+    elif decreased > increased and decreased > unchanged:
+        direction_text = (
+            f"{decreased} of {total} paired subjects showed a decrease in "
+            f"{feature} at {channel}."
+        )
+    else:
+        direction_text = (
+            f"{feature} at {channel} showed a mixed direction of change across "
+            "the paired subjects."
+        )
+
+    return (
+        f"{direction_text} The mean change was "
+        f"{format_bcf_acf_change(mean_change)}, and the median change was "
+        f"{format_bcf_acf_change(median_change)}. This is a descriptive "
+        f"{band}-band pattern and should not be interpreted as statistical "
+        "significance."
+    )
+
+
+def render_bcf_acf_subject_level():
+    """Render the completed BCF vs ACF subject-level analysis dashboard."""
+    st.subheader("Pre-post subject-level analysis")
+    st.caption(
+        "This section summarises within-subject changes from BCF to ACF while "
+        "preserving the identity of every paired observation."
+    )
+
+    try:
+        dataframe = load_bcf_acf_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BCF_ACF.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** BCF-ACF changes were heterogeneous across subjects, "
+        "channels, features, and frequency bands. Alpha showed the strongest "
+        "upward tendency, while Delta showed a slight downward tendency. Gamma "
+        "Band Power at AF8 increased in 9 of 10 subjects, whereas Theta Relative "
+        "Power at TP9 decreased in 9 of 10 subjects. Statistical significance "
+        "must be evaluated separately using paired tests, effect sizes, and FDR "
+        "correction."
+    )
+
+    selected_band = st.selectbox(
+        "Frequency band",
+        BCF_ACF_BAND_ORDER,
+        index=0,
+        key="bcf_acf_subject_band",
+    )
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    band_summary = get_bcf_acf_band_summary(dataframe, selected_band)
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Paired Subjects", band_data["Subject"].nunique())
+    metric_2.metric("Band-Specific Comparisons", band_summary["total"])
+    metric_3.metric(
+        "Increased",
+        band_summary["increased"],
+        f"{band_summary['increase_percentage']:.1f}%",
+    )
+    metric_4.metric(
+        "Decreased",
+        band_summary["decreased"],
+        f"{band_summary['decrease_percentage']:.1f}%",
+        delta_color="inverse",
+    )
+
+    st.info(f"**{selected_band} summary.** {band_summary['text']}")
+
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    available_channels = set(band_data["Channel"].dropna().unique())
+    channel_options = [
+        channel for channel in BCF_ACF_CHANNEL_ORDER if channel in available_channels
+    ]
+
+    if not feature_options or not channel_options:
+        st.error(
+            "No valid feature or channel options were found for the selected band."
+        )
+        return
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            key="bcf_acf_subject_feature",
+        )
+    with filter_2:
+        selected_channel = st.selectbox(
+            "Channel",
+            channel_options,
+            key="bcf_acf_subject_channel",
+        )
+
+    selected = band_data[
+        (band_data["Feature"] == selected_feature)
+        & (band_data["Channel"] == selected_channel)
+    ].copy()
+    selected = selected.sort_values("Subject")
+
+    if selected.empty:
+        st.warning("No subject-level records match the selected filters.")
+        return
+
+    paired_data = selected.melt(
+        id_vars=["Subject"],
+        value_vars=["BCF", "ACF"],
+        var_name="Condition",
+        value_name="Value",
+    )
+    paired_data["Subject Label"] = "Subject " + paired_data["Subject"].astype(str)
+
+    paired_figure = px.line(
+        paired_data,
+        x="Condition",
+        y="Value",
+        color="Subject Label",
+        markers=True,
+        category_orders={"Condition": ["BCF", "ACF"]},
+        title=(
+            "Paired Before-After Plot<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    paired_figure.update_traces(line={"width": 2}, marker={"size": 8})
+    paired_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Feature Value",
+        hovermode="closest",
+    )
+
+    direction_order = ["Increase", "Decrease", "No Change"]
+    direction_counts = (
+        selected["Direction"]
+        .value_counts()
+        .reindex(direction_order, fill_value=0)
+        .rename_axis("Direction")
+        .reset_index(name="Subjects")
+    )
+    direction_figure = px.bar(
+        direction_counts,
+        x="Direction",
+        y="Subjects",
+        color="Direction",
+        text="Subjects",
+        color_discrete_map=BCF_ACF_DIRECTION_COLORS,
+        category_orders={"Direction": direction_order},
+        title=(
+            "Direction of Change<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    direction_figure.update_traces(textposition="outside")
+    direction_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Number of Paired Subjects",
+        yaxis=dict(dtick=1, range=[0, max(11, len(selected) + 1)]),
+    )
+
+    chart_1, chart_2 = st.columns(2)
+    with chart_1:
+        st.plotly_chart(
+            paired_figure,
+            use_container_width=True,
+            key="bcf_acf_paired_plot",
+        )
+        st.caption(
+            "Each line connects measurements from the same subject. Upward lines "
+            "indicate ACF > BCF, while downward lines indicate ACF < BCF."
+        )
+    with chart_2:
+        st.plotly_chart(
+            direction_figure,
+            use_container_width=True,
+            key="bcf_acf_direction_plot",
+        )
+        st.caption(
+            "The bars count paired subjects whose selected feature increased, "
+            "decreased, or remained unchanged."
+        )
+
+    st.markdown("#### Interpretation")
+    st.write(
+        get_bcf_acf_selected_interpretation(
+            selected,
+            selected_band,
+            selected_feature,
+            selected_channel,
+        )
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BCF_ACF_BAND_ORDER:
+            summary = get_bcf_acf_band_summary(dataframe, band)
+            st.markdown(f"**{band}**  \n{summary['text']}")
+
+    with st.expander("Important data and methodological notes", expanded=False):
+        st.markdown(
+            """
+- Each frequency-band file contains 80 band-specific observations for Band Power and Relative Power.
+- Each file also contains 160 shared observations for Entropy and the three Hjorth features.
+- Shared features are repeated across the five band files and should not be counted five times in an All Bands summary.
+- Direction counts describe individual increases and decreases. They do not measure statistical significance or effect magnitude.
+- Mean changes should only be compared within the same feature and channel because the features use different numerical scales.
+            """
+        )
+
+    with st.expander("View selected subject-level data", expanded=False):
+        display_columns = [
+            "Subject",
+            "Channel",
+            "Feature",
+            "BCF",
+            "ACF",
+            "Change",
+            "Change_Percent",
+            "Direction",
+        ]
+        st.dataframe(
+            selected[display_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        safe_feature = (
+            selected_feature.lower().replace(" ", "_").replace("/", "_")
+        )
+        st.download_button(
+            "Download selected data (CSV)",
+            data=selected[display_columns].to_csv(index=False).encode("utf-8"),
+            file_name=(
+                f"BCF_ACF_{selected_band}_{safe_feature}_{selected_channel}.csv"
+            ),
+            mime="text/csv",
+            key="bcf_acf_subject_download",
+        )
+
+
+def get_bcf_acf_pre_post_key_finding(dataframe):
+    """Create the BCF vs ACF pre-post headline from band-specific rows."""
+    band_specific = dataframe[
+        dataframe["Feature_Type"].isin(["BP", "RP"])
+    ].copy()
+    total = len(band_specific)
+    increased = int((band_specific["Direction"] == "Increase").sum())
+    decreased = int((band_specific["Direction"] == "Decrease").sum())
+
+    band_counts = (
+        band_specific.groupby(["Band", "Direction"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in band_counts.columns:
+            band_counts[direction] = 0
+    band_totals = band_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    increase_rates = band_counts["Increase"].div(band_totals).mul(100)
+    decrease_rates = band_counts["Decrease"].div(band_totals).mul(100)
+    upward_band = increase_rates.idxmax()
+    downward_band = decrease_rates.idxmax()
+
+    pattern_counts = (
+        band_specific.groupby(
+            ["Band", "Channel", "Feature"], observed=True
+        )["Direction"]
+        .value_counts()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in pattern_counts.columns:
+            pattern_counts[direction] = 0
+    pattern_counts["Total"] = pattern_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    pattern_counts["Consistency"] = pattern_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].max(axis=1).div(pattern_counts["Total"]).mul(100)
+    pattern_counts["Dominant"] = pattern_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].idxmax(axis=1)
+
+    strongest_increase = (
+        pattern_counts[pattern_counts["Dominant"] == "Increase"]
+        .sort_values("Consistency", ascending=False)
+        .iloc[0]
+    )
+    strongest_decrease = (
+        pattern_counts[pattern_counts["Dominant"] == "Decrease"]
+        .sort_values("Consistency", ascending=False)
+        .iloc[0]
+    )
+    increase_band, increase_channel, increase_feature = (
+        strongest_increase.name
+    )
+    decrease_band, decrease_channel, decrease_feature = (
+        strongest_decrease.name
+    )
+
+    return (
+        f"Across {total} band-specific subject-channel-feature comparisons, "
+        f"{increased} increased ({increased / total * 100:.1f}%) and "
+        f"{decreased} decreased ({decreased / total * 100:.1f}%) from BCF to "
+        f"ACF. {upward_band} showed the strongest upward tendency, whereas "
+        f"{downward_band} had the largest proportion of decreases. The most "
+        f"consistent local increase was {increase_feature} at "
+        f"{increase_channel} in {increase_band} "
+        f"({strongest_increase['Consistency']:.0f}% of subjects), while the "
+        f"most consistent decrease was {decrease_feature} at "
+        f"{decrease_channel} in {decrease_band} "
+        f"({strongest_decrease['Consistency']:.0f}% of subjects)."
+    )
+
+
+def get_bcf_acf_pre_post_interpretation(feature_data, band, feature):
+    """Create a concise group-level interpretation across all four channels."""
+    total = len(feature_data)
+    increased = int((feature_data["Direction"] == "Increase").sum())
+    decreased = int((feature_data["Direction"] == "Decrease").sum())
+    unchanged = int((feature_data["Direction"] == "No Change").sum())
+
+    channel_summary = (
+        feature_data.groupby("Channel", observed=True)["Change"]
+        .agg(Mean_Change="mean", Median_Change="median", Subjects="size")
+    )
+    strongest_channel = channel_summary["Mean_Change"].abs().idxmax()
+    strongest_mean = channel_summary.loc[strongest_channel, "Mean_Change"]
+
+    direction_counts = (
+        feature_data.groupby(["Channel", "Direction"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in direction_counts.columns:
+            direction_counts[direction] = 0
+    direction_counts["Total"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    direction_counts["Consistency"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].max(axis=1).div(direction_counts["Total"])
+    direction_counts["Dominant"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].idxmax(axis=1)
+    most_consistent_channel = direction_counts["Consistency"].idxmax()
+    dominant_direction = direction_counts.loc[
+        most_consistent_channel, "Dominant"
+    ]
+    dominant_count = int(
+        direction_counts.loc[most_consistent_channel, dominant_direction]
+    )
+    dominant_total = int(
+        direction_counts.loc[most_consistent_channel, "Total"]
+    )
+
+    overall_pattern = (
+        "more increases than decreases"
+        if increased > decreased
+        else "more decreases than increases"
+        if decreased > increased
+        else "an equal number of increases and decreases"
+    )
+    unchanged_text = (
+        f", and {unchanged} showed no change" if unchanged else ""
+    )
+
+    return (
+        f"Across all four channels, {feature} in {band} showed "
+        f"{overall_pattern}: {increased} of {total} comparisons increased and "
+        f"{decreased} decreased{unchanged_text}. {strongest_channel} had the "
+        f"largest absolute mean change ({format_bcf_acf_change(strongest_mean)}). "
+        f"The most consistent direction occurred at {most_consistent_channel}, "
+        f"where {dominant_count} of {dominant_total} subjects showed a "
+        f"{dominant_direction.lower()}. These are group-level descriptive "
+        "patterns and do not establish statistical significance."
+    )
+
+
+def style_bcf_acf_pre_post_figure(figure, height):
+    """Apply a light transparent style shared by the Pre-Post figures."""
+    figure.update_layout(
+        height=height,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={"color": "#26343B", "size": 13},
+        title={"font": {"size": 18, "color": "#1F2933"}},
+        margin=dict(l=55, r=35, t=78, b=50),
+        hoverlabel={
+            "bgcolor": "#F7FAF9",
+            "font": {"color": "#1F2933"},
+        },
+    )
+    figure.update_xaxes(
+        gridcolor="rgba(88,110,105,0.12)",
+        linecolor="rgba(88,110,105,0.25)",
+        zeroline=False,
+    )
+    figure.update_yaxes(
+        gridcolor="rgba(88,110,105,0.12)",
+        linecolor="rgba(88,110,105,0.25)",
+        zeroline=False,
+    )
+    return figure
+
+
+def build_bcf_acf_pre_post_paired_figure(feature_data, band, feature):
+    """Build four compact channel panels of subject trajectories and means."""
+    subject_order = (
+        feature_data[["Subject"]]
+        .drop_duplicates()
+        .sort_values("Subject")["Subject"]
+        .tolist()
+    )
+    subject_color_map = {
+        subject: BCF_ACF_PREPOST_SUBJECT_COLORS[
+            index % len(BCF_ACF_PREPOST_SUBJECT_COLORS)
+        ]
+        for index, subject in enumerate(subject_order)
+    }
+
+    figure = make_subplots(
+        rows=2,
+        cols=2,
+        subplot_titles=BCF_ACF_CHANNEL_ORDER,
+        shared_yaxes=True,
+        vertical_spacing=0.16,
+        horizontal_spacing=0.10,
+    )
+
+    for index, channel in enumerate(BCF_ACF_CHANNEL_ORDER):
+        row = index // 2 + 1
+        column = index % 2 + 1
+        channel_data = feature_data[
+            feature_data["Channel"] == channel
+        ].sort_values("Subject")
+
+        for _, subject_row in channel_data.iterrows():
+            subject_label = str(subject_row["Subject"])
+            subject_color = subject_color_map[subject_row["Subject"]]
+            figure.add_trace(
+                go.Scatter(
+                    x=["BCF", "ACF"],
+                    y=[subject_row["BCF"], subject_row["ACF"]],
+                    mode="lines+markers",
+                    line={"color": subject_color, "width": 2},
+                    marker={
+                        "size": 7,
+                        "color": subject_color,
+                    },
+                    customdata=[subject_label, subject_label],
+                    hovertemplate=(
+                        "Subject: %{customdata}<br>Condition: %{x}<br>"
+                        "Value: %{y:.4g}<extra></extra>"
+                    ),
+                    showlegend=False,
+                ),
+                row=row,
+                col=column,
+            )
+
+        condition_means = channel_data[["BCF", "ACF"]].mean()
+        figure.add_trace(
+            go.Scatter(
+                x=["BCF", "ACF"],
+                y=[condition_means["BCF"], condition_means["ACF"]],
+                mode="lines+markers",
+                line={"color": "#174C5B", "width": 4},
+                marker={
+                    "size": 11,
+                    "color": [
+                        BCF_ACF_PREPOST_CONDITION_COLORS["BCF"],
+                        BCF_ACF_PREPOST_CONDITION_COLORS["ACF"],
+                    ],
+                    "line": {"color": "#F5FAF7", "width": 2},
+                },
+                hovertemplate=(
+                    "Channel mean<br>Condition: %{x}<br>"
+                    "Mean value: %{y:.4g}<extra></extra>"
+                ),
+                name="Channel mean",
+                showlegend=index == 0,
+            ),
+            row=row,
+            col=column,
+        )
+
+    figure.update_xaxes(title_text="")
+    figure.update_yaxes(title_text="Feature value", col=1)
+    figure.update_annotations(font={"size": 14, "color": "#174C5B"})
+    figure.update_layout(
+        title=(
+            "BCF to ACF Subject Trajectories<br>"
+            f"<sup>{band} · {feature}</sup>"
+        ),
+        showlegend=True,
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
+        hovermode="closest",
+    )
+    return style_bcf_acf_pre_post_figure(figure, 620)
+
+
+def build_bcf_acf_change_distribution_figure(feature_data, band, feature):
+    """Build compact box plots with all subject-level change values."""
+    figure = px.box(
+        feature_data,
+        x="Channel",
+        y="Change",
+        points="all",
+        color="Channel",
+        hover_data={"Subject": True, "Change": ":.4g"},
+        category_orders={"Channel": BCF_ACF_CHANNEL_ORDER},
+        color_discrete_map=BCF_ACF_PREPOST_CHANNEL_COLORS,
+        title=(
+            "Paired Change Distribution<br>"
+            f"<sup>{band} · {feature}</sup>"
+        ),
+    )
+    figure.update_traces(
+        jitter=0.32,
+        pointpos=0,
+        marker={"size": 7, "opacity": 0.74},
+        line={"width": 1.6},
+    )
+    for trace in figure.data:
+        trace.update(
+            fillcolor=BCF_ACF_PREPOST_CHANNEL_FILLS.get(
+                trace.name, "rgba(85,166,143,0.18)"
+            )
+        )
+    figure.add_hline(
+        y=0,
+        line_color="#455A64",
+        line_dash="dash",
+        line_width=1.4,
+    )
+    figure.update_layout(
+        showlegend=False,
+        xaxis_title="EEG Channel",
+        yaxis_title="Change (ACF - BCF)",
+    )
+    return style_bcf_acf_pre_post_figure(figure, 420)
+
+
+def build_bcf_acf_mean_change_figure(feature_data, band, feature):
+    """Build a horizontal lollipop chart of channel-level mean change."""
+    summary = (
+        feature_data.groupby("Channel", observed=True)["Change"]
+        .agg(Mean_Change="mean", Median_Change="median", Subjects="size")
+        .reindex(BCF_ACF_CHANNEL_ORDER)
+        .dropna(subset=["Mean_Change"])
+        .reset_index()
+    )
+    figure = go.Figure()
+    for _, summary_row in summary.iterrows():
+        channel = summary_row["Channel"]
+        mean_change = summary_row["Mean_Change"]
+        figure.add_trace(
+            go.Scatter(
+                x=[0, mean_change],
+                y=[channel, channel],
+                mode="lines",
+                line={
+                    "color": BCF_ACF_PREPOST_CHANNEL_COLORS[channel],
+                    "width": 5,
+                },
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+
+    figure.add_trace(
+        go.Scatter(
+            x=summary["Mean_Change"],
+            y=summary["Channel"],
+            mode="markers+text",
+            marker={
+                "size": 16,
+                "color": [
+                    BCF_ACF_PREPOST_CHANNEL_COLORS[channel]
+                    for channel in summary["Channel"]
+                ],
+                "line": {"color": "#F5FAF7", "width": 2},
+            },
+            text=[
+                format_bcf_acf_change(value)
+                for value in summary["Mean_Change"]
+            ],
+            textposition=[
+                "middle right" if value >= 0 else "middle left"
+                for value in summary["Mean_Change"]
+            ],
+            customdata=summary[["Median_Change", "Subjects"]].values,
+            hovertemplate=(
+                "Channel: %{y}<br>Mean change: %{x:.4g}<br>"
+                "Median change: %{customdata[0]:.4g}<br>"
+                "Paired subjects: %{customdata[1]:.0f}<extra></extra>"
+            ),
+            name="Mean change",
+            showlegend=False,
+        )
+    )
+    figure.add_vline(x=0, line_color="#455A64", line_width=1.4)
+    figure.update_layout(
+        title=(
+            "Mean Change by EEG Channel<br>"
+            f"<sup>{band} · {feature}</sup>"
+        ),
+        xaxis_title="Mean change (ACF - BCF)",
+        yaxis_title="EEG Channel",
+    )
+    figure.update_yaxes(
+        categoryorder="array",
+        categoryarray=list(reversed(BCF_ACF_CHANNEL_ORDER)),
+    )
+    return style_bcf_acf_pre_post_figure(figure, 360)
+
+
+def build_bcf_acf_direction_by_channel_figure(feature_data, band, feature):
+    """Build a compact horizontal direction-of-change chart by channel."""
+    direction_order = ["Increase", "Decrease", "No Change"]
+    available_channels = set(feature_data["Channel"].dropna().unique())
+    channel_order = [
+        channel
+        for channel in BCF_ACF_CHANNEL_ORDER
+        if channel in available_channels
+    ]
+    complete_index = pd.MultiIndex.from_product(
+        [channel_order, direction_order], names=["Channel", "Direction"]
+    )
+    counts = (
+        feature_data.groupby(["Channel", "Direction"], observed=True)
+        .size()
+        .reindex(complete_index, fill_value=0)
+        .rename("Subjects")
+        .reset_index()
+    )
+    totals = counts.groupby("Channel")["Subjects"].transform("sum")
+    counts["Percentage"] = (
+        counts["Subjects"].div(totals.replace(0, pd.NA)).mul(100).fillna(0)
+    )
+    totals_by_channel = (
+        feature_data.groupby("Channel", observed=True)
+        .size()
+        .reindex(channel_order)
+    )
+    figure = go.Figure()
+    for direction in direction_order:
+        direction_data = (
+            counts[counts["Direction"] == direction]
+            .set_index("Channel")
+            .reindex(channel_order)
+            .reset_index()
+        )
+        labels = [
+            f"{int(subjects)}/{int(totals_by_channel.loc[channel])}"
+            if percentage >= 12 and subjects > 0
+            else ""
+            for channel, subjects, percentage in zip(
+                direction_data["Channel"],
+                direction_data["Subjects"],
+                direction_data["Percentage"],
+            )
+        ]
+        figure.add_trace(
+            go.Bar(
+                x=direction_data["Percentage"],
+                y=direction_data["Channel"],
+                orientation="h",
+                name=direction,
+                marker_color=BCF_ACF_PREPOST_DIRECTION_COLORS[direction],
+                text=labels,
+                textposition="inside",
+                textfont={
+                    "color": (
+                        "#FFFFFF"
+                        if direction == "Increase"
+                        else "#26443A"
+                    )
+                },
+                customdata=direction_data[["Subjects"]].values,
+                hovertemplate=(
+                    "Channel: %{y}<br>Direction: %{fullData.name}<br>"
+                    "Subjects: %{customdata[0]:.0f}<br>"
+                    "Percentage: %{x:.1f}%<extra></extra>"
+                ),
+            )
+        )
+    figure.update_layout(
+        title=(
+            "Direction of Change by EEG Channel<br>"
+            f"<sup>{band} · {feature}</sup>"
+        ),
+        barmode="stack",
+        xaxis_title="Paired subjects (%)",
+        yaxis_title="EEG Channel",
+        legend={
+            "title_text": "",
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
+    )
+    figure.update_xaxes(range=[0, 100], ticksuffix="%")
+    figure.update_yaxes(
+        categoryorder="array",
+        categoryarray=list(reversed(channel_order)),
+    )
+    return style_bcf_acf_pre_post_figure(figure, 360)
+
+
+def render_bcf_acf_pre_post_visualizations():
+    """Render four interactive BCF vs ACF pre-post visualizations."""
+    st.subheader("Pre-post visualizations")
+    st.caption(
+        "Explore subject trajectories, the distribution of paired changes, "
+        "channel-level mean change, and direction of change from BCF to ACF."
+    )
+
+    try:
+        dataframe = load_bcf_acf_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BCF_ACF.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bcf_acf_pre_post_key_finding(dataframe)} "
+        "These visual patterns are descriptive; statistical evidence is "
+        "reported separately in the Paired Statistics tab."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bcf_acf_prepost_band",
+        )
+
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    if not feature_options:
+        st.error("No valid features were found for the selected frequency band.")
+        return
+
+    with filter_2:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="bcf_acf_prepost_feature",
+        )
+
+    feature_data = band_data[
+        band_data["Feature"] == selected_feature
+    ].copy().sort_values(["Channel", "Subject"])
+    available_channels = set(feature_data["Channel"].dropna().unique())
+    missing_channels = [
+        channel
+        for channel in BCF_ACF_CHANNEL_ORDER
+        if channel not in available_channels
+    ]
+    if missing_channels:
+        st.error(
+            "The selected group-level view is incomplete. Missing channels: "
+            + ", ".join(missing_channels)
+        )
+        return
+
+    if feature_data.empty:
+        st.warning("No paired observations match the selected band and feature.")
+        return
+
+    st.info(
+        "**Group-level interpretation.** "
+        + get_bcf_acf_pre_post_interpretation(
+            feature_data,
+            selected_band,
+            selected_feature,
+        )
+    )
+
+    paired_figure = build_bcf_acf_pre_post_paired_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        paired_figure,
+        use_container_width=True,
+        key="bcf_acf_prepost_paired_plot",
+    )
+    st.caption(
+        "Four panels show TP9, AF7, AF8, and TP10 simultaneously. Each line "
+        "connects the BCF and ACF values from the same subject."
+    )
+
+    distribution_figure = build_bcf_acf_change_distribution_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        distribution_figure,
+        use_container_width=True,
+        key="bcf_acf_prepost_change_distribution",
+    )
+    st.caption(
+        "Boxes show the median and interquartile range; dots preserve all 10 "
+        "subject-level ACF-minus-BCF changes at each channel."
+    )
+
+    mean_figure = build_bcf_acf_mean_change_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        mean_figure,
+        use_container_width=True,
+        key="bcf_acf_prepost_mean_change",
+    )
+    st.caption(
+        "Each lollipop extends from zero to the mean paired change. Hover over "
+        "a marker to compare the mean, median, and paired-subject count."
+    )
+
+    direction_figure = build_bcf_acf_direction_by_channel_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        direction_figure,
+        use_container_width=True,
+        key="bcf_acf_prepost_direction_by_channel",
+    )
+
+
+def find_bf_af_subject_level_file():
+    """Return the first configured BF vs AF subject-level CSV that exists."""
+    for file_path in BF_AF_SUBJECT_LEVEL_FILES:
+        if file_path.exists():
+            return file_path
+    return None
+
+
+@st.cache_data
+def load_bf_af_subject_level():
+    """Load and validate the BF vs AF subject-level master table."""
+    file_path = find_bf_af_subject_level_file()
+    if file_path is None:
+        expected_locations = "\n".join(
+            f"- {path.relative_to(APP_DIRECTORY)}"
+            for path in BF_AF_SUBJECT_LEVEL_FILES
+        )
+        raise FileNotFoundError(
+            "subject_level_master_BF_AF.csv was not found. "
+            "Place the file in one of these locations:\n"
+            f"{expected_locations}"
+        )
+
+    dataframe = pd.read_csv(file_path)
+    required_columns = {
+        "Band",
+        "Subject",
+        "Channel",
+        "Feature_Type",
+        "Feature",
+        "BF",
+        "AF",
+    }
+    missing_columns = required_columns.difference(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            "The BF vs AF subject-level CSV is missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Channel"] = dataframe["Channel"].astype(str).str.strip().str.upper()
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Type"] = (
+        dataframe["Feature_Type"].astype(str).str.strip().str.upper()
+    )
+
+    for column in ["BF", "AF"]:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+
+    # Use AF minus BF as the reproducible pre-post change definition.
+    dataframe["Change"] = dataframe["AF"] - dataframe["BF"]
+    baseline = dataframe["BF"].abs().replace(0, pd.NA)
+    dataframe["Change_Percent"] = dataframe["Change"] / baseline * 100
+
+    dataframe["Direction"] = dataframe["Change"].apply(
+        lambda value: (
+            "Missing"
+            if pd.isna(value)
+            else "Increase"
+            if value > 0
+            else "Decrease"
+            if value < 0
+            else "No Change"
+        )
+    )
+
+    return dataframe
+
+
+def format_bf_af_change(value):
+    """Format BF vs AF changes without hiding small relative-power values."""
+    if pd.isna(value):
+        return "N/A"
+    if abs(value) >= 1000:
+        return f"{value:+,.2f}"
+    if abs(value) >= 1:
+        return f"{value:+,.3f}"
+    return f"{value:+.4f}"
+
+
+def get_bf_af_band_summary(dataframe, band):
+    """Summarise BP and RP observations for one BF vs AF frequency band."""
+    band_data = dataframe[dataframe["Band"] == band]
+    band_specific = band_data[band_data["Feature_Type"].isin(["BP", "RP"])]
+
+    total = len(band_specific)
+    increased = int((band_specific["Direction"] == "Increase").sum())
+    decreased = int((band_specific["Direction"] == "Decrease").sum())
+    unchanged = int((band_specific["Direction"] == "No Change").sum())
+
+    increase_percentage = increased / total * 100 if total else 0.0
+    decrease_percentage = decreased / total * 100 if total else 0.0
+
+    if increase_percentage >= 55:
+        tendency = "an upward tendency"
+    elif decrease_percentage >= 55:
+        tendency = "a downward tendency"
+    elif increased > decreased:
+        tendency = "a slight upward tendency"
+    elif decreased > increased:
+        tendency = "a slight downward tendency"
+    else:
+        tendency = "a balanced pattern"
+
+    summary_text = (
+        f"{band} showed {tendency}. {increased} of {total} band-specific "
+        f"comparisons increased ({increase_percentage:.1f}%), while {decreased} "
+        f"decreased ({decrease_percentage:.1f}%). "
+        f"{BF_AF_BAND_HIGHLIGHTS[band]}"
+    )
+
+    return {
+        "text": summary_text,
+        "total": total,
+        "increased": increased,
+        "decreased": decreased,
+        "unchanged": unchanged,
+        "increase_percentage": increase_percentage,
+        "decrease_percentage": decrease_percentage,
+    }
+
+
+def get_bf_af_selected_interpretation(selected, band, feature, channel):
+    """Create a concise interpretation for the selected BF vs AF paired plot."""
+    total = len(selected)
+    increased = int((selected["Direction"] == "Increase").sum())
+    decreased = int((selected["Direction"] == "Decrease").sum())
+    unchanged = int((selected["Direction"] == "No Change").sum())
+
+    mean_change = selected["Change"].mean()
+    median_change = selected["Change"].median()
+
+    if increased > decreased and increased > unchanged:
+        direction_text = (
+            f"{increased} of {total} paired subjects showed an increase in "
+            f"{feature} at {channel}."
+        )
+    elif decreased > increased and decreased > unchanged:
+        direction_text = (
+            f"{decreased} of {total} paired subjects showed a decrease in "
+            f"{feature} at {channel}."
+        )
+    else:
+        direction_text = (
+            f"{feature} at {channel} showed a mixed direction of change across "
+            "the paired subjects."
+        )
+
+    distribution_note = ""
+    if mean_change * median_change < 0:
+        distribution_note = (
+            " The mean and median have opposite signs, indicating that a small "
+            "number of larger changes influenced the mean."
+        )
+
+    return (
+        f"{direction_text} The mean change was "
+        f"{format_bf_af_change(mean_change)}, and the median change was "
+        f"{format_bf_af_change(median_change)}.{distribution_note} This is a "
+        f"descriptive {band}-band pattern and should not be interpreted as "
+        "statistical significance."
+    )
+
+
+def render_bf_af_subject_level():
+    """Render the completed BF vs AF subject-level analysis dashboard."""
+    st.subheader("Pre-post subject-level analysis")
+    st.caption(
+        "This section summarises within-subject changes from BF to AF while "
+        "preserving the identity of every paired observation."
+    )
+
+    try:
+        dataframe = load_bf_af_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BF_AF.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** BF-AF changes were heterogeneous across subjects, "
+        "channels, features, and frequency bands. Gamma and Alpha showed the "
+        "strongest upward tendencies, while Theta showed the clearest downward "
+        "tendency. Gamma Band Power at AF7 increased in 8 of 10 subjects, "
+        "whereas Theta Relative Power at AF8 and Theta Band Power at TP10 "
+        "decreased in 8 of 10 subjects. These are descriptive patterns. "
+        "Statistical significance must be evaluated separately using paired "
+        "tests, effect sizes, and FDR correction."
+    )
+
+    selected_band = st.selectbox(
+        "Frequency band",
+        BF_AF_BAND_ORDER,
+        index=0,
+        key="bf_af_subject_band",
+    )
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    band_summary = get_bf_af_band_summary(dataframe, selected_band)
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Paired Subjects", band_data["Subject"].nunique())
+    metric_2.metric("Band-Specific Comparisons", band_summary["total"])
+    metric_3.metric(
+        "Increased",
+        band_summary["increased"],
+        f"{band_summary['increase_percentage']:.1f}%",
+    )
+    metric_4.metric(
+        "Decreased",
+        band_summary["decreased"],
+        f"{band_summary['decrease_percentage']:.1f}%",
+        delta_color="inverse",
+    )
+
+    st.info(f"**{selected_band} summary.** {band_summary['text']}")
+
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    available_channels = set(band_data["Channel"].dropna().unique())
+    channel_options = [
+        channel for channel in BF_AF_CHANNEL_ORDER if channel in available_channels
+    ]
+
+    if not feature_options or not channel_options:
+        st.error(
+            "No valid feature or channel options were found for the selected band."
+        )
+        return
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            key="bf_af_subject_feature",
+        )
+    with filter_2:
+        default_channel = (
+            channel_options.index("AF7") if "AF7" in channel_options else 0
+        )
+        selected_channel = st.selectbox(
+            "Channel",
+            channel_options,
+            index=default_channel,
+            key="bf_af_subject_channel",
+        )
+
+    selected = band_data[
+        (band_data["Feature"] == selected_feature)
+        & (band_data["Channel"] == selected_channel)
+    ].copy()
+    selected = selected.sort_values("Subject")
+
+    if selected.empty:
+        st.warning("No subject-level records match the selected filters.")
+        return
+
+    paired_data = selected.melt(
+        id_vars=["Subject"],
+        value_vars=["BF", "AF"],
+        var_name="Condition",
+        value_name="Value",
+    )
+    paired_data["Subject Label"] = "Subject " + paired_data["Subject"].astype(str)
+
+    paired_figure = px.line(
+        paired_data,
+        x="Condition",
+        y="Value",
+        color="Subject Label",
+        markers=True,
+        category_orders={"Condition": ["BF", "AF"]},
+        title=(
+            "Paired Before-After Plot<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    paired_figure.update_traces(line={"width": 2}, marker={"size": 8})
+    paired_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Feature Value",
+        hovermode="closest",
+    )
+
+    direction_order = ["Increase", "Decrease", "No Change"]
+    direction_counts = (
+        selected["Direction"]
+        .value_counts()
+        .reindex(direction_order, fill_value=0)
+        .rename_axis("Direction")
+        .reset_index(name="Subjects")
+    )
+    direction_figure = px.bar(
+        direction_counts,
+        x="Direction",
+        y="Subjects",
+        color="Direction",
+        text="Subjects",
+        color_discrete_map=BF_AF_DIRECTION_COLORS,
+        category_orders={"Direction": direction_order},
+        title=(
+            "Direction of Change<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    direction_figure.update_traces(textposition="outside")
+    direction_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Number of Paired Subjects",
+        yaxis=dict(dtick=1, range=[0, max(11, len(selected) + 1)]),
+    )
+
+    chart_1, chart_2 = st.columns(2)
+    with chart_1:
+        st.plotly_chart(
+            paired_figure,
+            use_container_width=True,
+            key="bf_af_paired_plot",
+        )
+        st.caption(
+            "Each line connects measurements from the same subject. Upward lines "
+            "indicate AF > BF, while downward lines indicate AF < BF."
+        )
+    with chart_2:
+        st.plotly_chart(
+            direction_figure,
+            use_container_width=True,
+            key="bf_af_direction_plot",
+        )
+        st.caption(
+            "The bars count paired subjects whose selected feature increased, "
+            "decreased, or remained unchanged."
+        )
+
+    st.markdown("#### Interpretation")
+    st.write(
+        get_bf_af_selected_interpretation(
+            selected,
+            selected_band,
+            selected_feature,
+            selected_channel,
+        )
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BF_AF_BAND_ORDER:
+            summary = get_bf_af_band_summary(dataframe, band)
+            st.markdown(f"**{band}**  \n{summary['text']}")
+
+    with st.expander("Important data and methodological notes", expanded=False):
+        st.markdown(
+            """
+- Each frequency-band file contains 80 band-specific observations for Band Power and Relative Power.
+- Each file also contains 160 shared observations for Entropy and the three Hjorth features.
+- Shared features are repeated across the five band files and should not be counted five times in an All Bands summary.
+- Across the five bands, the comparison contains 400 band-specific observations and 560 unique observations after repeated shared features are removed.
+- Change is calculated as AF minus BF.
+- Direction counts describe individual increases and decreases. They do not measure statistical significance or effect magnitude.
+- Mean changes should only be compared within the same feature and channel because the features use different numerical scales.
+            """
+        )
+
+    with st.expander("View selected subject-level data", expanded=False):
+        display_columns = [
+            "Subject",
+            "Channel",
+            "Feature",
+            "BF",
+            "AF",
+            "Change",
+            "Change_Percent",
+            "Direction",
+        ]
+        st.dataframe(
+            selected[display_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        safe_feature = (
+            selected_feature.lower().replace(" ", "_").replace("/", "_")
+        )
+        st.download_button(
+            "Download selected data (CSV)",
+            data=selected[display_columns].to_csv(index=False).encode("utf-8"),
+            file_name=(
+                f"BF_AF_{selected_band}_{safe_feature}_{selected_channel}.csv"
+            ),
+            mime="text/csv",
+            key="bf_af_subject_download",
+        )
+
+
+def get_bf_af_pre_post_key_finding(dataframe):
+    """Create the BF vs AF pre-post headline from band-specific rows."""
+    return (
+        get_bcf_acf_pre_post_key_finding(dataframe)
+        .replace("BCF", "BF")
+        .replace("ACF", "AF")
+    )
+
+
+def get_bf_af_pre_post_interpretation(feature_data, band, feature):
+    """Create a concise BF vs AF interpretation across all four channels."""
+    total = len(feature_data)
+    increased = int((feature_data["Direction"] == "Increase").sum())
+    decreased = int((feature_data["Direction"] == "Decrease").sum())
+    unchanged = int((feature_data["Direction"] == "No Change").sum())
+
+    channel_summary = (
+        feature_data.groupby("Channel", observed=True)["Change"]
+        .agg(Mean_Change="mean", Median_Change="median", Subjects="size")
+    )
+    strongest_channel = channel_summary["Mean_Change"].abs().idxmax()
+    strongest_mean = channel_summary.loc[strongest_channel, "Mean_Change"]
+
+    direction_counts = (
+        feature_data.groupby(["Channel", "Direction"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in direction_counts.columns:
+            direction_counts[direction] = 0
+    direction_counts["Total"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    direction_counts["Consistency"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].max(axis=1).div(direction_counts["Total"])
+    direction_counts["Dominant"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].idxmax(axis=1)
+    most_consistent_channel = direction_counts["Consistency"].idxmax()
+    dominant_direction = direction_counts.loc[
+        most_consistent_channel, "Dominant"
+    ]
+    dominant_count = int(
+        direction_counts.loc[most_consistent_channel, dominant_direction]
+    )
+    dominant_total = int(
+        direction_counts.loc[most_consistent_channel, "Total"]
+    )
+
+    overall_pattern = (
+        "more increases than decreases"
+        if increased > decreased
+        else "more decreases than increases"
+        if decreased > increased
+        else "an equal number of increases and decreases"
+    )
+    unchanged_text = (
+        f", and {unchanged} showed no change" if unchanged else ""
+    )
+
+    return (
+        f"Across all four channels, {feature} in {band} showed "
+        f"{overall_pattern}: {increased} of {total} comparisons increased and "
+        f"{decreased} decreased{unchanged_text}. {strongest_channel} had the "
+        f"largest absolute mean change ({format_bf_af_change(strongest_mean)}). "
+        f"The most consistent direction occurred at {most_consistent_channel}, "
+        f"where {dominant_count} of {dominant_total} subjects showed a "
+        f"{dominant_direction.lower()}. These are group-level descriptive "
+        "patterns and do not establish statistical significance."
+    )
+
+
+def _replace_bcf_acf_figure_labels(figure):
+    """Convert labels in a reusable BCF-ACF figure to BF-AF labels."""
+    title_text = figure.layout.title.text or ""
+    figure.update_layout(
+        title_text=title_text.replace("BCF", "BF").replace("ACF", "AF")
+    )
+    return figure
+
+
+def build_bf_af_pre_post_paired_figure(feature_data, band, feature):
+    """Build four channel panels of BF to AF subject trajectories."""
+    reusable_data = feature_data.rename(columns={"BF": "BCF", "AF": "ACF"})
+    figure = build_bcf_acf_pre_post_paired_figure(
+        reusable_data, band, feature
+    )
+    for trace in figure.data:
+        if tuple(trace.x) == ("BCF", "ACF"):
+            trace.x = ("BF", "AF")
+    return _replace_bcf_acf_figure_labels(figure)
+
+
+def build_bf_af_change_distribution_figure(feature_data, band, feature):
+    """Build channel-level box plots of AF-minus-BF paired changes."""
+    figure = build_bcf_acf_change_distribution_figure(
+        feature_data, band, feature
+    )
+    figure.update_yaxes(title_text="Change (AF - BF)")
+    return _replace_bcf_acf_figure_labels(figure)
+
+
+def build_bf_af_mean_change_figure(feature_data, band, feature):
+    """Build a horizontal lollipop chart of AF-minus-BF mean change."""
+    figure = build_bcf_acf_mean_change_figure(feature_data, band, feature)
+    figure.update_xaxes(title_text="Mean change (AF - BF)")
+    return _replace_bcf_acf_figure_labels(figure)
+
+
+def build_bf_af_direction_by_channel_figure(feature_data, band, feature):
+    """Build a horizontal direction-of-change chart for BF vs AF."""
+    figure = build_bcf_acf_direction_by_channel_figure(
+        feature_data, band, feature
+    )
+    return _replace_bcf_acf_figure_labels(figure)
+
+
+def render_bf_af_pre_post_visualizations():
+    """Render four interactive BF vs AF pre-post visualizations."""
+    st.subheader("Pre-post visualizations")
+    st.caption(
+        "Explore subject trajectories, the distribution of paired changes, "
+        "channel-level mean change, and direction of change from BF to AF."
+    )
+
+    try:
+        dataframe = load_bf_af_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BF_AF.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bf_af_pre_post_key_finding(dataframe)} "
+        "These visual patterns are descriptive; statistical evidence is "
+        "reported separately in the Paired Statistics tab."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BF_AF_BAND_ORDER,
+            index=0,
+            key="bf_af_prepost_band",
+        )
+
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    if not feature_options:
+        st.error("No valid features were found for the selected frequency band.")
+        return
+
+    with filter_2:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="bf_af_prepost_feature",
+        )
+
+    feature_data = band_data[
+        band_data["Feature"] == selected_feature
+    ].copy().sort_values(["Channel", "Subject"])
+    available_channels = set(feature_data["Channel"].dropna().unique())
+    missing_channels = [
+        channel
+        for channel in BF_AF_CHANNEL_ORDER
+        if channel not in available_channels
+    ]
+    if missing_channels:
+        st.error(
+            "The selected group-level view is incomplete. Missing channels: "
+            + ", ".join(missing_channels)
+        )
+        return
+
+    if feature_data.empty:
+        st.warning("No paired observations match the selected band and feature.")
+        return
+
+    st.info(
+        "**Group-level interpretation.** "
+        + get_bf_af_pre_post_interpretation(
+            feature_data,
+            selected_band,
+            selected_feature,
+        )
+    )
+
+    paired_figure = build_bf_af_pre_post_paired_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        paired_figure,
+        use_container_width=True,
+        key="bf_af_prepost_paired_plot",
+    )
+    st.caption(
+        "Four panels show TP9, AF7, AF8, and TP10 simultaneously. Each line "
+        "connects the BF and AF values from the same subject."
+    )
+
+    distribution_figure = build_bf_af_change_distribution_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        distribution_figure,
+        use_container_width=True,
+        key="bf_af_prepost_change_distribution",
+    )
+    st.caption(
+        "Boxes show the median and interquartile range; dots preserve all 10 "
+        "subject-level AF-minus-BF changes at each channel."
+    )
+
+    mean_figure = build_bf_af_mean_change_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        mean_figure,
+        use_container_width=True,
+        key="bf_af_prepost_mean_change",
+    )
+    st.caption(
+        "Each lollipop extends from zero to the mean paired change. Hover over "
+        "a marker to compare the mean, median, and paired-subject count."
+    )
+
+    direction_figure = build_bf_af_direction_by_channel_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        direction_figure,
+        use_container_width=True,
+        key="bf_af_prepost_direction_by_channel",
+    )
+
+
+def find_bcm_acm_subject_level_file():
+    """Return the first configured BCM vs ACM subject-level CSV that exists."""
+    for file_path in BCM_ACM_SUBJECT_LEVEL_FILES:
+        if file_path.exists():
+            return file_path
+    return None
+
+
+@st.cache_data
+def load_bcm_acm_subject_level():
+    """Load and validate the BCM vs ACM subject-level master table."""
+    file_path = find_bcm_acm_subject_level_file()
+    if file_path is None:
+        expected_locations = "\n".join(
+            f"- {path.relative_to(APP_DIRECTORY)}"
+            for path in BCM_ACM_SUBJECT_LEVEL_FILES
+        )
+        raise FileNotFoundError(
+            "subject_level_master_BCM_ACM.csv was not found. "
+            "Place the file in one of these locations:\n"
+            f"{expected_locations}"
+        )
+
+    dataframe = pd.read_csv(file_path)
+    required_columns = {
+        "Band",
+        "Subject",
+        "Channel",
+        "Feature_Type",
+        "Feature",
+        "BCM",
+        "ACM",
+    }
+    missing_columns = required_columns.difference(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            "The BCM vs ACM subject-level CSV is missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Channel"] = dataframe["Channel"].astype(str).str.strip().str.upper()
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Type"] = (
+        dataframe["Feature_Type"].astype(str).str.strip().str.upper()
+    )
+
+    for column in ["BCM", "ACM"]:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+
+    # Use ACM minus BCM as the reproducible pre-post change definition.
+    dataframe["Change"] = dataframe["ACM"] - dataframe["BCM"]
+    baseline = dataframe["BCM"].abs().replace(0, pd.NA)
+    dataframe["Change_Percent"] = dataframe["Change"] / baseline * 100
+
+    dataframe["Direction"] = dataframe["Change"].apply(
+        lambda value: (
+            "Missing"
+            if pd.isna(value)
+            else "Increase"
+            if value > 0
+            else "Decrease"
+            if value < 0
+            else "No Change"
+        )
+    )
+
+    return dataframe
+
+
+def format_bcm_acm_change(value):
+    """Format BCM vs ACM changes without hiding small relative-power values."""
+    if pd.isna(value):
+        return "N/A"
+    if abs(value) >= 1000:
+        return f"{value:+,.2f}"
+    if abs(value) >= 1:
+        return f"{value:+,.3f}"
+    return f"{value:+.4f}"
+
+
+def get_bcm_acm_band_summary(dataframe, band):
+    """Summarise BP and RP observations for one BCM vs ACM frequency band."""
+    band_data = dataframe[dataframe["Band"] == band]
+    band_specific = band_data[band_data["Feature_Type"].isin(["BP", "RP"])]
+
+    total = len(band_specific)
+    increased = int((band_specific["Direction"] == "Increase").sum())
+    decreased = int((band_specific["Direction"] == "Decrease").sum())
+    unchanged = int((band_specific["Direction"] == "No Change").sum())
+
+    increase_percentage = increased / total * 100 if total else 0.0
+    decrease_percentage = decreased / total * 100 if total else 0.0
+
+    if increase_percentage >= 55:
+        tendency = "an upward tendency"
+    elif decrease_percentage >= 55:
+        tendency = "a modest downward tendency"
+    elif increased > decreased:
+        tendency = "a slight upward tendency"
+    elif decreased > increased:
+        tendency = "a slight downward tendency"
+    else:
+        tendency = "a balanced pattern"
+
+    summary_text = (
+        f"{band} showed {tendency}. {decreased} of {total} band-specific "
+        f"comparisons decreased ({decrease_percentage:.1f}%), while {increased} "
+        f"increased ({increase_percentage:.1f}%). "
+        f"{BCM_ACM_BAND_HIGHLIGHTS[band]}"
+    )
+
+    return {
+        "text": summary_text,
+        "total": total,
+        "increased": increased,
+        "decreased": decreased,
+        "unchanged": unchanged,
+        "increase_percentage": increase_percentage,
+        "decrease_percentage": decrease_percentage,
+    }
+
+
+def get_bcm_acm_selected_interpretation(selected, band, feature, channel):
+    """Create a concise interpretation for the selected BCM vs ACM plot."""
+    total = len(selected)
+    increased = int((selected["Direction"] == "Increase").sum())
+    decreased = int((selected["Direction"] == "Decrease").sum())
+    unchanged = int((selected["Direction"] == "No Change").sum())
+
+    mean_change = selected["Change"].mean()
+    median_change = selected["Change"].median()
+
+    if increased > decreased and increased > unchanged:
+        direction_text = (
+            f"{increased} of {total} paired subjects showed an increase in "
+            f"{feature} at {channel}."
+        )
+    elif decreased > increased and decreased > unchanged:
+        direction_text = (
+            f"{decreased} of {total} paired subjects showed a decrease in "
+            f"{feature} at {channel}."
+        )
+    else:
+        direction_text = (
+            f"{feature} at {channel} showed a mixed direction of change across "
+            "the paired subjects."
+        )
+
+    distribution_note = ""
+    if mean_change * median_change < 0:
+        distribution_note = (
+            " The mean and median have opposite signs, indicating that a small "
+            "number of larger changes influenced the mean."
+        )
+
+    return (
+        f"{direction_text} The mean change was "
+        f"{format_bcm_acm_change(mean_change)}, and the median change was "
+        f"{format_bcm_acm_change(median_change)}.{distribution_note} This is a "
+        f"descriptive {band}-band pattern and should not be interpreted as "
+        "statistical significance."
+    )
+
+
+def render_bcm_acm_subject_level():
+    """Render the completed BCM vs ACM subject-level analysis dashboard."""
+    st.subheader("Pre-post subject-level analysis")
+    st.caption(
+        "This section summarises within-subject changes from BCM to ACM while "
+        "preserving the identity of every paired observation."
+    )
+
+    try:
+        dataframe = load_bcm_acm_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BCM_ACM.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** Across 400 band-specific subject-channel-feature "
+        "comparisons, 175 increased (43.8%) and 225 decreased (56.3%) from "
+        "BCM to ACM. All five bands showed the same split of 35 increases and "
+        "45 decreases. Alpha Band Power at AF8 and Delta Relative Power at "
+        "TP9 each decreased in 8 of 10 subjects. Several opposing local "
+        "patterns were also present, showing that the response depended on "
+        "the channel and feature. Statistical significance must be evaluated "
+        "separately using paired tests, effect sizes, and FDR correction."
+    )
+
+    selected_band = st.selectbox(
+        "Frequency band",
+        BCM_ACM_BAND_ORDER,
+        index=0,
+        key="bcm_acm_subject_band",
+    )
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    band_summary = get_bcm_acm_band_summary(dataframe, selected_band)
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Paired Subjects", band_data["Subject"].nunique())
+    metric_2.metric("Band-Specific Comparisons", band_summary["total"])
+    metric_3.metric(
+        "Increased",
+        band_summary["increased"],
+        f"{band_summary['increase_percentage']:.1f}%",
+    )
+    metric_4.metric(
+        "Decreased",
+        band_summary["decreased"],
+        f"{band_summary['decrease_percentage']:.1f}%",
+        delta_color="inverse",
+    )
+
+    st.info(f"**{selected_band} summary.** {band_summary['text']}")
+
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    available_channels = set(band_data["Channel"].dropna().unique())
+    channel_options = [
+        channel for channel in BCM_ACM_CHANNEL_ORDER if channel in available_channels
+    ]
+
+    if not feature_options or not channel_options:
+        st.error(
+            "No valid feature or channel options were found for the selected band."
+        )
+        return
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            key="bcm_acm_subject_feature",
+        )
+    with filter_2:
+        selected_channel = st.selectbox(
+            "Channel",
+            channel_options,
+            key="bcm_acm_subject_channel",
+        )
+
+    selected = band_data[
+        (band_data["Feature"] == selected_feature)
+        & (band_data["Channel"] == selected_channel)
+    ].copy()
+    selected = selected.sort_values("Subject")
+
+    if selected.empty:
+        st.warning("No subject-level records match the selected filters.")
+        return
+
+    paired_data = selected.melt(
+        id_vars=["Subject"],
+        value_vars=["BCM", "ACM"],
+        var_name="Condition",
+        value_name="Value",
+    )
+    paired_data["Subject Label"] = "Subject " + paired_data["Subject"].astype(str)
+
+    paired_figure = px.line(
+        paired_data,
+        x="Condition",
+        y="Value",
+        color="Subject Label",
+        markers=True,
+        category_orders={"Condition": ["BCM", "ACM"]},
+        title=(
+            "Paired Before-After Plot<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    paired_figure.update_traces(line={"width": 2}, marker={"size": 8})
+    paired_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Feature Value",
+        hovermode="closest",
+    )
+
+    direction_order = ["Increase", "Decrease", "No Change"]
+    direction_counts = (
+        selected["Direction"]
+        .value_counts()
+        .reindex(direction_order, fill_value=0)
+        .rename_axis("Direction")
+        .reset_index(name="Subjects")
+    )
+    direction_figure = px.bar(
+        direction_counts,
+        x="Direction",
+        y="Subjects",
+        color="Direction",
+        text="Subjects",
+        color_discrete_map=BCM_ACM_DIRECTION_COLORS,
+        category_orders={"Direction": direction_order},
+        title=(
+            "Direction of Change<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    direction_figure.update_traces(textposition="outside")
+    direction_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Number of Paired Subjects",
+        yaxis=dict(dtick=1, range=[0, max(11, len(selected) + 1)]),
+    )
+
+    chart_1, chart_2 = st.columns(2)
+    with chart_1:
+        st.plotly_chart(
+            paired_figure,
+            use_container_width=True,
+            key="bcm_acm_paired_plot",
+        )
+        st.caption(
+            "Each line connects measurements from the same subject. Upward lines "
+            "indicate ACM > BCM, while downward lines indicate ACM < BCM."
+        )
+    with chart_2:
+        st.plotly_chart(
+            direction_figure,
+            use_container_width=True,
+            key="bcm_acm_direction_plot",
+        )
+        st.caption(
+            "The bars count paired subjects whose selected feature increased, "
+            "decreased, or remained unchanged."
+        )
+
+    st.markdown("#### Interpretation")
+    st.write(
+        get_bcm_acm_selected_interpretation(
+            selected,
+            selected_band,
+            selected_feature,
+            selected_channel,
+        )
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BCM_ACM_BAND_ORDER:
+            summary = get_bcm_acm_band_summary(dataframe, band)
+            st.markdown(f"**{band}**  \n{summary['text']}")
+
+    with st.expander("Important data and methodological notes", expanded=False):
+        st.markdown(
+            """
+- Each frequency-band file contains 80 band-specific observations for Band Power and Relative Power.
+- Each file also contains 160 shared observations for Entropy and the three Hjorth features.
+- Shared features are repeated across the five band files and should not be counted five times in an All Bands summary.
+- The 1,200 source rows represent 400 band-specific observations and 800 repeated shared-feature rows. After repeated shared features are removed, the dataset contains 560 unique observations.
+- Change is calculated as ACM minus BCM.
+- Direction counts describe individual increases and decreases. They do not measure statistical significance or effect magnitude.
+- Mean changes should only be compared within the same feature and channel because the features use different numerical scales.
+            """
+        )
+
+    with st.expander("View selected subject-level data", expanded=False):
+        display_columns = [
+            "Subject",
+            "Channel",
+            "Feature",
+            "BCM",
+            "ACM",
+            "Change",
+            "Change_Percent",
+            "Direction",
+        ]
+        st.dataframe(
+            selected[display_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        safe_feature = (
+            selected_feature.lower().replace(" ", "_").replace("/", "_")
+        )
+        st.download_button(
+            "Download selected data (CSV)",
+            data=selected[display_columns].to_csv(index=False).encode("utf-8"),
+            file_name=(
+                f"BCM_ACM_{selected_band}_{safe_feature}_{selected_channel}.csv"
+            ),
+            mime="text/csv",
+            key="bcm_acm_subject_download",
+        )
+
+
+def get_bcm_acm_pre_post_key_finding(dataframe):
+    """Create an accurate BCM vs ACM headline from band-specific rows."""
+    band_specific = dataframe[
+        dataframe["Feature_Type"].isin(["BP", "RP"])
+    ].copy()
+    total = len(band_specific)
+    increased = int((band_specific["Direction"] == "Increase").sum())
+    decreased = int((band_specific["Direction"] == "Decrease").sum())
+
+    band_counts = (
+        band_specific.groupby(["Band", "Direction"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in band_counts.columns:
+            band_counts[direction] = 0
+    band_totals = band_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    increase_rates = band_counts["Increase"].div(band_totals).mul(100)
+    decrease_rates = band_counts["Decrease"].div(band_totals).mul(100)
+
+    if increase_rates.nunique() == 1 and decrease_rates.nunique() == 1:
+        band_tendency = (
+            "All five frequency bands showed the same overall distribution "
+            f"of {int(band_counts['Increase'].iloc[0])} increases and "
+            f"{int(band_counts['Decrease'].iloc[0])} decreases."
+        )
+    else:
+        band_tendency = (
+            f"{increase_rates.idxmax()} showed the strongest upward tendency, "
+            f"whereas {decrease_rates.idxmax()} had the largest proportion "
+            "of decreases."
+        )
+
+    pattern_counts = (
+        band_specific.groupby(
+            ["Band", "Channel", "Feature"], observed=True
+        )["Direction"]
+        .value_counts()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in pattern_counts.columns:
+            pattern_counts[direction] = 0
+    pattern_counts["Total"] = pattern_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    pattern_counts["Consistency"] = pattern_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].max(axis=1).div(pattern_counts["Total"]).mul(100)
+    pattern_counts["Dominant"] = pattern_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].idxmax(axis=1)
+
+    strongest_increase = (
+        pattern_counts[pattern_counts["Dominant"] == "Increase"]
+        .sort_values("Consistency", ascending=False)
+        .iloc[0]
+    )
+    strongest_decrease = (
+        pattern_counts[pattern_counts["Dominant"] == "Decrease"]
+        .sort_values("Consistency", ascending=False)
+        .iloc[0]
+    )
+    increase_band, increase_channel, increase_feature = strongest_increase.name
+    decrease_band, decrease_channel, decrease_feature = strongest_decrease.name
+
+    return (
+        f"Across {total} band-specific subject-channel-feature comparisons, "
+        f"{increased} increased ({increased / total * 100:.1f}%) and "
+        f"{decreased} decreased "
+        f"({decreased / total * 100 + 1e-9:.1f}%) from BCM to "
+        f"ACM. {band_tendency} The most consistent local increase was "
+        f"{increase_feature} at {increase_channel} in {increase_band} "
+        f"({strongest_increase['Consistency']:.0f}% of subjects), while the "
+        f"most consistent decrease was {decrease_feature} at "
+        f"{decrease_channel} in {decrease_band} "
+        f"({strongest_decrease['Consistency']:.0f}% of subjects)."
+    )
+
+
+def get_bcm_acm_pre_post_interpretation(feature_data, band, feature):
+    """Create a concise BCM vs ACM interpretation across all channels."""
+    total = len(feature_data)
+    increased = int((feature_data["Direction"] == "Increase").sum())
+    decreased = int((feature_data["Direction"] == "Decrease").sum())
+    unchanged = int((feature_data["Direction"] == "No Change").sum())
+
+    channel_summary = (
+        feature_data.groupby("Channel", observed=True)["Change"]
+        .agg(Mean_Change="mean", Median_Change="median", Subjects="size")
+    )
+    strongest_channel = channel_summary["Mean_Change"].abs().idxmax()
+    strongest_mean = channel_summary.loc[strongest_channel, "Mean_Change"]
+
+    direction_counts = (
+        feature_data.groupby(["Channel", "Direction"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in direction_counts.columns:
+            direction_counts[direction] = 0
+    direction_counts["Total"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    direction_counts["Consistency"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].max(axis=1).div(direction_counts["Total"])
+    direction_counts["Dominant"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].idxmax(axis=1)
+    most_consistent_channel = direction_counts["Consistency"].idxmax()
+    dominant_direction = direction_counts.loc[
+        most_consistent_channel, "Dominant"
+    ]
+    dominant_count = int(
+        direction_counts.loc[most_consistent_channel, dominant_direction]
+    )
+    dominant_total = int(
+        direction_counts.loc[most_consistent_channel, "Total"]
+    )
+
+    overall_pattern = (
+        "more increases than decreases"
+        if increased > decreased
+        else "more decreases than increases"
+        if decreased > increased
+        else "an equal number of increases and decreases"
+    )
+    unchanged_text = (
+        f", and {unchanged} showed no change" if unchanged else ""
+    )
+
+    return (
+        f"Across all four channels, {feature} in {band} showed "
+        f"{overall_pattern}: {increased} of {total} comparisons increased and "
+        f"{decreased} decreased{unchanged_text}. {strongest_channel} had the "
+        f"largest absolute mean change "
+        f"({format_bcm_acm_change(strongest_mean)}). The most consistent "
+        f"direction occurred at {most_consistent_channel}, where "
+        f"{dominant_count} of {dominant_total} subjects showed a "
+        f"{dominant_direction.lower()}. These are group-level descriptive "
+        "patterns and do not establish statistical significance."
+    )
+
+
+def _replace_bcf_acf_with_bcm_acm_figure_labels(figure):
+    """Convert labels in a reusable BCF-ACF figure to BCM-ACM labels."""
+    title_text = figure.layout.title.text or ""
+    figure.update_layout(
+        title_text=title_text.replace("BCF", "BCM").replace("ACF", "ACM")
+    )
+    return figure
+
+
+def build_bcm_acm_pre_post_paired_figure(feature_data, band, feature):
+    """Build four channel panels of BCM to ACM subject trajectories."""
+    reusable_data = feature_data.rename(
+        columns={"BCM": "BCF", "ACM": "ACF"}
+    )
+    figure = build_bcf_acf_pre_post_paired_figure(
+        reusable_data, band, feature
+    )
+    for trace in figure.data:
+        if tuple(trace.x) == ("BCF", "ACF"):
+            trace.x = ("BCM", "ACM")
+    return _replace_bcf_acf_with_bcm_acm_figure_labels(figure)
+
+
+def build_bcm_acm_change_distribution_figure(feature_data, band, feature):
+    """Build channel box plots of ACM-minus-BCM paired changes."""
+    figure = build_bcf_acf_change_distribution_figure(
+        feature_data, band, feature
+    )
+    figure.update_yaxes(title_text="Change (ACM - BCM)")
+    return _replace_bcf_acf_with_bcm_acm_figure_labels(figure)
+
+
+def build_bcm_acm_mean_change_figure(feature_data, band, feature):
+    """Build a horizontal lollipop chart of ACM-minus-BCM mean change."""
+    figure = build_bcf_acf_mean_change_figure(feature_data, band, feature)
+    figure.update_xaxes(title_text="Mean change (ACM - BCM)")
+    return _replace_bcf_acf_with_bcm_acm_figure_labels(figure)
+
+
+def build_bcm_acm_direction_by_channel_figure(feature_data, band, feature):
+    """Build a horizontal direction-of-change chart for BCM vs ACM."""
+    figure = build_bcf_acf_direction_by_channel_figure(
+        feature_data, band, feature
+    )
+    return _replace_bcf_acf_with_bcm_acm_figure_labels(figure)
+
+
+def render_bcm_acm_pre_post_visualizations():
+    """Render four interactive BCM vs ACM pre-post visualizations."""
+    st.subheader("Pre-post visualizations")
+    st.caption(
+        "Explore subject trajectories, the distribution of paired changes, "
+        "channel-level mean change, and direction of change from BCM to ACM."
+    )
+
+    try:
+        dataframe = load_bcm_acm_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BCM_ACM.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bcm_acm_pre_post_key_finding(dataframe)} "
+        "These visual patterns are descriptive; statistical evidence is "
+        "reported separately in the Paired Statistics tab."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCM_ACM_BAND_ORDER,
+            index=0,
+            key="bcm_acm_prepost_band",
+        )
+
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    if not feature_options:
+        st.error("No valid features were found for the selected frequency band.")
+        return
+
+    with filter_2:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="bcm_acm_prepost_feature",
+        )
+
+    feature_data = band_data[
+        band_data["Feature"] == selected_feature
+    ].copy().sort_values(["Channel", "Subject"])
+    available_channels = set(feature_data["Channel"].dropna().unique())
+    missing_channels = [
+        channel
+        for channel in BCM_ACM_CHANNEL_ORDER
+        if channel not in available_channels
+    ]
+    if missing_channels:
+        st.error(
+            "The selected group-level view is incomplete. Missing channels: "
+            + ", ".join(missing_channels)
+        )
+        return
+
+    if feature_data.empty:
+        st.warning("No paired observations match the selected band and feature.")
+        return
+
+    st.info(
+        "**Group-level interpretation.** "
+        + get_bcm_acm_pre_post_interpretation(
+            feature_data,
+            selected_band,
+            selected_feature,
+        )
+    )
+
+    paired_figure = build_bcm_acm_pre_post_paired_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        paired_figure,
+        use_container_width=True,
+        key="bcm_acm_prepost_paired_plot",
+    )
+    st.caption(
+        "Four panels show TP9, AF7, AF8, and TP10 simultaneously. Each line "
+        "connects the BCM and ACM values from the same subject."
+    )
+
+    distribution_figure = build_bcm_acm_change_distribution_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        distribution_figure,
+        use_container_width=True,
+        key="bcm_acm_prepost_change_distribution",
+    )
+    st.caption(
+        "Boxes show the median and interquartile range; dots preserve all 10 "
+        "subject-level ACM-minus-BCM changes at each channel."
+    )
+
+    mean_figure = build_bcm_acm_mean_change_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        mean_figure,
+        use_container_width=True,
+        key="bcm_acm_prepost_mean_change",
+    )
+    st.caption(
+        "Each lollipop extends from zero to the mean paired change. Hover over "
+        "a marker to compare the mean, median, and paired-subject count."
+    )
+
+    direction_figure = build_bcm_acm_direction_by_channel_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        direction_figure,
+        use_container_width=True,
+        key="bcm_acm_prepost_direction_by_channel",
+    )
+
+
+def find_bm_am_subject_level_file():
+    """Return the first configured BM vs AM subject-level CSV that exists."""
+    for file_path in BM_AM_SUBJECT_LEVEL_FILES:
+        if file_path.exists():
+            return file_path
+    return None
+
+
+@st.cache_data
+def load_bm_am_subject_level():
+    """Load and validate the BM vs AM subject-level master table."""
+    file_path = find_bm_am_subject_level_file()
+    if file_path is None:
+        expected_locations = "\n".join(
+            f"- {path.relative_to(APP_DIRECTORY)}"
+            for path in BM_AM_SUBJECT_LEVEL_FILES
+        )
+        raise FileNotFoundError(
+            "subject_level_master_BM_AM.csv was not found. "
+            "Place the file in one of these locations:\n"
+            f"{expected_locations}"
+        )
+
+    dataframe = pd.read_csv(file_path)
+    required_columns = {
+        "Band",
+        "Subject",
+        "Channel",
+        "Feature_Type",
+        "Feature",
+        "BM",
+        "AM",
+    }
+    missing_columns = required_columns.difference(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            "The BM vs AM subject-level CSV is missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Channel"] = dataframe["Channel"].astype(str).str.strip().str.upper()
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Type"] = (
+        dataframe["Feature_Type"].astype(str).str.strip().str.upper()
+    )
+
+    for column in ["BM", "AM"]:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+
+    if dataframe[["BM", "AM"]].isna().any().any():
+        raise ValueError(
+            "The BM vs AM subject-level CSV contains missing or non-numeric "
+            "values in the BM or AM columns."
+        )
+
+    # Recalculate all derived fields so the dashboard consistently uses AM - BM.
+    dataframe["Change"] = dataframe["AM"] - dataframe["BM"]
+    baseline = dataframe["BM"].abs().replace(0, pd.NA)
+    dataframe["Change_Percent"] = dataframe["Change"] / baseline * 100
+    dataframe["Direction"] = dataframe["Change"].apply(
+        lambda value: (
+            "Missing"
+            if pd.isna(value)
+            else "Increase"
+            if value > 0
+            else "Decrease"
+            if value < 0
+            else "No Change"
+        )
+    )
+
+    return dataframe
+
+
+def format_bm_am_change(value):
+    """Format BM vs AM changes without hiding small relative-power values."""
+    if pd.isna(value):
+        return "N/A"
+    if abs(value) >= 1000:
+        return f"{value:+,.2f}"
+    if abs(value) >= 1:
+        return f"{value:+,.3f}"
+    return f"{value:+.4f}"
+
+
+def get_bm_am_band_summary(dataframe, band):
+    """Summarise BP and RP observations for one BM vs AM frequency band."""
+    band_data = dataframe[dataframe["Band"] == band]
+    band_specific = band_data[band_data["Feature_Type"].isin(["BP", "RP"])]
+
+    total = len(band_specific)
+    increased = int((band_specific["Direction"] == "Increase").sum())
+    decreased = int((band_specific["Direction"] == "Decrease").sum())
+    unchanged = int((band_specific["Direction"] == "No Change").sum())
+
+    increase_percentage = increased / total * 100 if total else 0.0
+    decrease_percentage = decreased / total * 100 if total else 0.0
+
+    if increase_percentage >= 55:
+        tendency = "an upward tendency"
+    elif decrease_percentage >= 57:
+        tendency = "the clearest downward tendency"
+    elif decrease_percentage >= 55:
+        tendency = "a modest downward tendency"
+    elif increased > decreased:
+        tendency = "a slight upward tendency"
+    elif decreased > increased:
+        tendency = "a slight downward tendency"
+    else:
+        tendency = "a balanced pattern"
+
+    summary_text = (
+        f"{band} showed {tendency}, with {increased} of {total} band-specific "
+        f"comparisons increasing ({increase_percentage:.1f}%) and {decreased} "
+        f"decreasing ({decrease_percentage:.1f}%). "
+        f"{BM_AM_BAND_HIGHLIGHTS[band]}"
+    )
+
+    return {
+        "text": summary_text,
+        "total": total,
+        "increased": increased,
+        "decreased": decreased,
+        "unchanged": unchanged,
+        "increase_percentage": increase_percentage,
+        "decrease_percentage": decrease_percentage,
+    }
+
+
+def get_bm_am_selected_interpretation(selected, band, feature, channel):
+    """Create a concise interpretation for the selected BM vs AM plot."""
+    total = len(selected)
+    increased = int((selected["Direction"] == "Increase").sum())
+    decreased = int((selected["Direction"] == "Decrease").sum())
+    unchanged = int((selected["Direction"] == "No Change").sum())
+
+    mean_change = selected["Change"].mean()
+    median_change = selected["Change"].median()
+
+    if increased > decreased and increased > unchanged:
+        direction_text = (
+            f"{increased} of {total} paired subjects showed an increase in "
+            f"{feature} at {channel} from BM to AM."
+        )
+    elif decreased > increased and decreased > unchanged:
+        direction_text = (
+            f"{decreased} of {total} paired subjects showed a decrease in "
+            f"{feature} at {channel} from BM to AM."
+        )
+    else:
+        direction_text = (
+            f"{feature} at {channel} showed a mixed direction of change across "
+            "the paired subjects."
+        )
+
+    distribution_note = ""
+    if mean_change * median_change < 0:
+        distribution_note = (
+            " The mean and median have opposite signs, indicating that a small "
+            "number of larger changes influenced the mean."
+        )
+
+    return (
+        f"{direction_text} The mean change was "
+        f"{format_bm_am_change(mean_change)}, and the median change was "
+        f"{format_bm_am_change(median_change)}.{distribution_note} This is a "
+        f"descriptive {band}-band pattern and should not be interpreted as "
+        "statistical significance."
+    )
+
+
+def render_bm_am_subject_level():
+    """Render the completed BM vs AM subject-level analysis dashboard."""
+    st.subheader("Pre-post subject-level analysis")
+    st.caption(
+        "This section summarises within-subject changes from BM to AM while "
+        "preserving the identity of every paired observation."
+    )
+
+    try:
+        dataframe = load_bm_am_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BM_AM.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** Across 400 band-specific subject-channel-feature "
+        "comparisons, 184 increased (46.0%) and 216 decreased (54.0%) from "
+        "BM to AM. Gamma was nearly balanced with a slight upward tendency, "
+        "while Delta showed the largest proportion of decreases. Alpha Band "
+        "Power at TP9 and Delta Band Power at AF8 each decreased in 9 of 10 "
+        "subjects. These are descriptive patterns and require separate "
+        "statistical evaluation using paired tests, effect sizes, and FDR "
+        "correction."
+    )
+
+    selected_band = st.selectbox(
+        "Frequency band",
+        BM_AM_BAND_ORDER,
+        index=0,
+        key="bm_am_subject_band",
+    )
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    band_summary = get_bm_am_band_summary(dataframe, selected_band)
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Paired Subjects", band_data["Subject"].nunique())
+    metric_2.metric("Band-Specific Comparisons", band_summary["total"])
+    metric_3.metric(
+        "Increased",
+        band_summary["increased"],
+        f"{band_summary['increase_percentage']:.1f}%",
+    )
+    metric_4.metric(
+        "Decreased",
+        band_summary["decreased"],
+        f"{band_summary['decrease_percentage']:.1f}%",
+        delta_color="inverse",
+    )
+
+    st.info(f"**{selected_band} summary.** {band_summary['text']}")
+
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    available_channels = set(band_data["Channel"].dropna().unique())
+    channel_options = [
+        channel for channel in BM_AM_CHANNEL_ORDER if channel in available_channels
+    ]
+
+    if not feature_options or not channel_options:
+        st.error(
+            "No valid feature or channel options were found for the selected band."
+        )
+        return
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            key="bm_am_subject_feature",
+        )
+    with filter_2:
+        selected_channel = st.selectbox(
+            "Channel",
+            channel_options,
+            key="bm_am_subject_channel",
+        )
+
+    selected = band_data[
+        (band_data["Feature"] == selected_feature)
+        & (band_data["Channel"] == selected_channel)
+    ].copy()
+    selected = selected.sort_values("Subject")
+
+    if selected.empty:
+        st.warning("No subject-level records match the selected filters.")
+        return
+
+    paired_data = selected.melt(
+        id_vars=["Subject"],
+        value_vars=["BM", "AM"],
+        var_name="Condition",
+        value_name="Value",
+    )
+    paired_data["Subject Label"] = "Subject " + paired_data["Subject"].astype(str)
+
+    paired_figure = px.line(
+        paired_data,
+        x="Condition",
+        y="Value",
+        color="Subject Label",
+        markers=True,
+        category_orders={"Condition": ["BM", "AM"]},
+        title=(
+            "Paired Before-After Plot<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    paired_figure.update_traces(line={"width": 2}, marker={"size": 8})
+    paired_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Feature Value",
+        hovermode="closest",
+    )
+
+    direction_order = ["Increase", "Decrease", "No Change"]
+    direction_counts = (
+        selected["Direction"]
+        .value_counts()
+        .reindex(direction_order, fill_value=0)
+        .rename_axis("Direction")
+        .reset_index(name="Subjects")
+    )
+    direction_figure = px.bar(
+        direction_counts,
+        x="Direction",
+        y="Subjects",
+        color="Direction",
+        text="Subjects",
+        color_discrete_map=BM_AM_DIRECTION_COLORS,
+        category_orders={"Direction": direction_order},
+        title=(
+            "Direction of Change<br>"
+            f"<sup>{selected_band} | {selected_feature} | {selected_channel}</sup>"
+        ),
+    )
+    direction_figure.update_traces(textposition="outside")
+    direction_figure.update_layout(
+        showlegend=False,
+        height=430,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis_title="",
+        yaxis_title="Number of Paired Subjects",
+        yaxis=dict(dtick=1, range=[0, max(11, len(selected) + 1)]),
+    )
+
+    chart_1, chart_2 = st.columns(2)
+    with chart_1:
+        st.plotly_chart(
+            paired_figure,
+            use_container_width=True,
+            key="bm_am_paired_plot",
+        )
+        st.caption(
+            "Each line connects measurements from the same subject. Upward "
+            "lines indicate AM > BM, while downward lines indicate AM < BM."
+        )
+    with chart_2:
+        st.plotly_chart(
+            direction_figure,
+            use_container_width=True,
+            key="bm_am_direction_plot",
+        )
+        st.caption(
+            "The bars count paired subjects whose selected feature increased, "
+            "decreased, or remained unchanged."
+        )
+
+    st.markdown("#### Interpretation")
+    st.write(
+        get_bm_am_selected_interpretation(
+            selected,
+            selected_band,
+            selected_feature,
+            selected_channel,
+        )
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BM_AM_BAND_ORDER:
+            summary = get_bm_am_band_summary(dataframe, band)
+            st.markdown(f"**{band}**  \n{summary['text']}")
+
+    with st.expander("Important data and methodological notes", expanded=False):
+        st.markdown(
+            """
+- Each frequency-band file contains 80 band-specific observations for Band Power and Relative Power.
+- Each file also contains 160 shared observations for Entropy and the three Hjorth features.
+- Shared features are repeated across the five band files and should not be counted five times in an All Bands summary.
+- The 1,200 source rows represent 400 band-specific observations and 800 repeated shared-feature rows. After repeated shared features are removed, the dataset contains 560 unique observations.
+- A `Band_Mismatches` value of 160 reflects the shared Entropy and Hjorth features; it is not a data error.
+- Change is calculated as AM minus BM.
+- Direction counts describe individual increases and decreases. They do not measure statistical significance or effect magnitude.
+- Opposite signs between the mean and median suggest that unusually large observations influenced the average.
+- Raw changes should only be compared within the same feature and channel because EEG features use different numerical scales.
+            """
+        )
+
+    with st.expander("View selected subject-level data", expanded=False):
+        display_columns = [
+            "Subject",
+            "Channel",
+            "Feature",
+            "BM",
+            "AM",
+            "Change",
+            "Change_Percent",
+            "Direction",
+        ]
+        st.dataframe(
+            selected[display_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        safe_feature = (
+            selected_feature.lower().replace(" ", "_").replace("/", "_")
+        )
+        st.download_button(
+            "Download selected data (CSV)",
+            data=selected[display_columns].to_csv(index=False).encode("utf-8"),
+            file_name=f"BM_AM_{selected_band}_{safe_feature}_{selected_channel}.csv",
+            mime="text/csv",
+            key="bm_am_subject_download",
+        )
+
+
+def get_bm_am_pre_post_key_finding(dataframe):
+    """Create the BM vs AM pre-post headline from band-specific rows."""
+    return (
+        get_bcf_acf_pre_post_key_finding(dataframe)
+        .replace("BCF", "BM")
+        .replace("ACF", "AM")
+    )
+
+
+def get_bm_am_pre_post_interpretation(feature_data, band, feature):
+    """Create a concise BM vs AM interpretation across all four channels."""
+    total = len(feature_data)
+    increased = int((feature_data["Direction"] == "Increase").sum())
+    decreased = int((feature_data["Direction"] == "Decrease").sum())
+    unchanged = int((feature_data["Direction"] == "No Change").sum())
+
+    channel_summary = (
+        feature_data.groupby("Channel", observed=True)["Change"]
+        .agg(Mean_Change="mean", Median_Change="median", Subjects="size")
+    )
+    strongest_channel = channel_summary["Mean_Change"].abs().idxmax()
+    strongest_mean = channel_summary.loc[strongest_channel, "Mean_Change"]
+
+    direction_counts = (
+        feature_data.groupby(["Channel", "Direction"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+    )
+    for direction in ["Increase", "Decrease", "No Change"]:
+        if direction not in direction_counts.columns:
+            direction_counts[direction] = 0
+    direction_counts["Total"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].sum(axis=1)
+    direction_counts["Consistency"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].max(axis=1).div(direction_counts["Total"])
+    direction_counts["Dominant"] = direction_counts[
+        ["Increase", "Decrease", "No Change"]
+    ].idxmax(axis=1)
+    most_consistent_channel = direction_counts["Consistency"].idxmax()
+    dominant_direction = direction_counts.loc[
+        most_consistent_channel, "Dominant"
+    ]
+    dominant_count = int(
+        direction_counts.loc[most_consistent_channel, dominant_direction]
+    )
+    dominant_total = int(
+        direction_counts.loc[most_consistent_channel, "Total"]
+    )
+
+    overall_pattern = (
+        "more increases than decreases"
+        if increased > decreased
+        else "more decreases than increases"
+        if decreased > increased
+        else "an equal number of increases and decreases"
+    )
+    unchanged_text = (
+        f", and {unchanged} showed no change" if unchanged else ""
+    )
+
+    return (
+        f"Across all four channels, {feature} in {band} showed "
+        f"{overall_pattern}: {increased} of {total} comparisons increased and "
+        f"{decreased} decreased{unchanged_text}. {strongest_channel} had the "
+        f"largest absolute mean change ({format_bm_am_change(strongest_mean)}). "
+        f"The most consistent direction occurred at {most_consistent_channel}, "
+        f"where {dominant_count} of {dominant_total} subjects showed a "
+        f"{dominant_direction.lower()}. These are group-level descriptive "
+        "patterns and do not establish statistical significance."
+    )
+
+
+def _replace_bcf_acf_with_bm_am_figure_labels(figure):
+    """Convert labels in a reusable BCF-ACF figure to BM-AM labels."""
+    title_text = figure.layout.title.text or ""
+    figure.update_layout(
+        title_text=title_text.replace("BCF", "BM").replace("ACF", "AM")
+    )
+    return figure
+
+
+def build_bm_am_pre_post_paired_figure(feature_data, band, feature):
+    """Build four channel panels of BM to AM subject trajectories."""
+    reusable_data = feature_data.rename(columns={"BM": "BCF", "AM": "ACF"})
+    figure = build_bcf_acf_pre_post_paired_figure(
+        reusable_data, band, feature
+    )
+    for trace in figure.data:
+        if tuple(trace.x) == ("BCF", "ACF"):
+            trace.x = ("BM", "AM")
+    return _replace_bcf_acf_with_bm_am_figure_labels(figure)
+
+
+def build_bm_am_change_distribution_figure(feature_data, band, feature):
+    """Build channel-level box plots of AM-minus-BM paired changes."""
+    figure = build_bcf_acf_change_distribution_figure(
+        feature_data, band, feature
+    )
+    figure.update_yaxes(title_text="Change (AM - BM)")
+    return _replace_bcf_acf_with_bm_am_figure_labels(figure)
+
+
+def build_bm_am_mean_change_figure(feature_data, band, feature):
+    """Build a horizontal lollipop chart of AM-minus-BM mean change."""
+    figure = build_bcf_acf_mean_change_figure(feature_data, band, feature)
+    figure.update_xaxes(title_text="Mean change (AM - BM)")
+    return _replace_bcf_acf_with_bm_am_figure_labels(figure)
+
+
+def build_bm_am_direction_by_channel_figure(feature_data, band, feature):
+    """Build a horizontal direction-of-change chart for BM vs AM."""
+    figure = build_bcf_acf_direction_by_channel_figure(
+        feature_data, band, feature
+    )
+    return _replace_bcf_acf_with_bm_am_figure_labels(figure)
+
+
+def render_bm_am_pre_post_visualizations():
+    """Render four interactive BM vs AM pre-post visualizations."""
+    st.subheader("Pre-post visualizations")
+    st.caption(
+        "Explore subject trajectories, the distribution of paired changes, "
+        "channel-level mean change, and direction of change from BM to AM."
+    )
+
+    try:
+        dataframe = load_bm_am_subject_level()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep subject_level_master_BM_AM.csv beside app.py or place it "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bm_am_pre_post_key_finding(dataframe)} "
+        "These visual patterns are descriptive; statistical evidence is "
+        "reported separately in the Paired Statistics tab."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BM_AM_BAND_ORDER,
+            index=0,
+            key="bm_am_prepost_band",
+        )
+
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    if not feature_options:
+        st.error("No valid features were found for the selected frequency band.")
+        return
+
+    with filter_2:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="bm_am_prepost_feature",
+        )
+
+    feature_data = band_data[
+        band_data["Feature"] == selected_feature
+    ].copy().sort_values(["Channel", "Subject"])
+    available_channels = set(feature_data["Channel"].dropna().unique())
+    missing_channels = [
+        channel
+        for channel in BM_AM_CHANNEL_ORDER
+        if channel not in available_channels
+    ]
+    if missing_channels:
+        st.error(
+            "The selected group-level view is incomplete. Missing channels: "
+            + ", ".join(missing_channels)
+        )
+        return
+
+    if feature_data.empty:
+        st.warning("No paired observations match the selected band and feature.")
+        return
+
+    st.info(
+        "**Group-level interpretation.** "
+        + get_bm_am_pre_post_interpretation(
+            feature_data,
+            selected_band,
+            selected_feature,
+        )
+    )
+
+    paired_figure = build_bm_am_pre_post_paired_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        paired_figure,
+        use_container_width=True,
+        key="bm_am_prepost_paired_plot",
+    )
+    st.caption(
+        "Four panels show TP9, AF7, AF8, and TP10 simultaneously. Each line "
+        "connects the BM and AM values from the same subject."
+    )
+
+    distribution_figure = build_bm_am_change_distribution_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        distribution_figure,
+        use_container_width=True,
+        key="bm_am_prepost_change_distribution",
+    )
+    st.caption(
+        "Boxes show the median and interquartile range; dots preserve all 10 "
+        "subject-level AM-minus-BM changes at each channel."
+    )
+
+    mean_figure = build_bm_am_mean_change_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        mean_figure,
+        use_container_width=True,
+        key="bm_am_prepost_mean_change",
+    )
+    st.caption(
+        "Each lollipop extends from zero to the mean paired change. Hover over "
+        "a marker to compare the mean, median, and paired-subject count."
+    )
+
+    direction_figure = build_bm_am_direction_by_channel_figure(
+        feature_data, selected_band, selected_feature
+    )
+    st.plotly_chart(
+        direction_figure,
+        use_container_width=True,
+        key="bm_am_prepost_direction_by_channel",
+    )
+
+
+def get_bcf_acf_synthetic_quality_band_from_name(file_name):
+    """Extract the frequency band from a synthetic-quality filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCF_ACF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bcf_acf_synthetic_quality_source():
+    """Find the BCF-ACF synthetic-quality ZIP or extracted CSV files."""
+    for zip_path in BCF_ACF_SYNTHETIC_QUALITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BCF_ACF_SYNTHETIC_QUALITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "SyntheticQuality_*_FeatureComparison_BCF_vs_ACF.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bcf_acf_synthetic_quality():
+    """Load and validate the five BCF-ACF synthetic-quality tables."""
+    source_type, source = find_bcf_acf_synthetic_quality_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BCF vs ACF synthetic-quality data were not found. Keep "
+            "'synthetic_quality_master BCF ACF.zip' beside app.py, or "
+            "extract its five SyntheticQuality CSV files into "
+            "synthetic_quality_master/, data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "syntheticquality" in name.lower()
+                and "featurecomparison" in name.lower()
+                and "bcf" in name.lower()
+                and "acf" in name.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bcf_acf_synthetic_quality_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcf_acf_synthetic_quality_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BCF vs ACF SyntheticQuality FeatureComparison CSV files "
+            "were found in the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BCF_ACF_SYNTHETIC_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BCF vs ACF synthetic-quality data are missing required "
+            "columns: " + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Label",
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Real_SD",
+        "Synthetic_SD",
+        "Real_Median",
+        "Synthetic_Median",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Real_N",
+        "Synthetic_N",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The synthetic-quality CSV files contain missing or non-numeric "
+            "values in required summary columns."
+        )
+
+    expected_labels = dataframe["Condition"].map({"BCF": 0, "ACF": 1})
+    if expected_labels.isna().any() or not (
+        dataframe["Label"] == expected_labels
+    ).all():
+        raise ValueError(
+            "Condition and Label are inconsistent. Expected BCF = 0 and "
+            "ACF = 1 in every synthetic-quality row."
+        )
+
+    for metric_name, metric_config in BCF_ACF_SYNTHETIC_METRICS.items():
+        difference_column = metric_config["difference"]
+        absolute_column = metric_config["absolute"]
+        dataframe[difference_column] = (
+            dataframe[metric_config["synthetic"]]
+            - dataframe[metric_config["real"]]
+        )
+        dataframe[absolute_column] = dataframe[difference_column].abs()
+
+    absolute_columns = [
+        metric_config["absolute"]
+        for metric_config in BCF_ACF_SYNTHETIC_METRICS.values()
+    ]
+    dataframe["Average_Absolute_Summary_Gap"] = dataframe[
+        absolute_columns
+    ].mean(axis=1)
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BCF vs ACF synthetic-quality data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BCF_ACF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "Synthetic-quality data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BCF", "ACF"}:
+        raise ValueError(
+            "Synthetic-quality data must contain both BCF and ACF conditions."
+        )
+
+    return dataframe
+
+
+def get_bcf_acf_synthetic_feature_order(dataframe, band):
+    """Return a stable display order for the selected band's six features."""
+    preferred_features = [
+        f"{band}_BP",
+        f"{band}_RP",
+        "Entropy",
+        "Hjorth_Activity",
+        "Hjorth_Mobility",
+        "Hjorth_Complexity",
+    ]
+    available_features = set(dataframe["Feature"].dropna().unique())
+    ordered = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    ordered.extend(sorted(available_features.difference(ordered)))
+    return ordered
+
+
+def get_bcf_acf_synthetic_quality_key_finding(dataframe):
+    """Create a global descriptive finding from all five quality tables."""
+    metric_averages = {
+        metric_name: dataframe[metric_config["absolute"]].mean()
+        for metric_name, metric_config in BCF_ACF_SYNTHETIC_METRICS.items()
+    }
+    largest_metric = max(metric_averages, key=metric_averages.get)
+    band_gaps = dataframe.groupby("Band", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    condition_gaps = dataframe.groupby("Condition", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    review_row = dataframe.loc[
+        dataframe["Average_Absolute_Summary_Gap"].idxmax()
+    ]
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature summaries, "
+        f"the mean absolute gaps were {metric_averages['Mean']:.3f} for the "
+        f"mean, {metric_averages['Standard deviation']:.3f} for SD, "
+        f"{metric_averages['Median']:.3f} for the median, and "
+        f"{metric_averages['IQR']:.3f} for IQR. {largest_metric} showed the "
+        f"largest average discrepancy. {band_gaps.idxmax()} had the largest "
+        f"average summary gap ({band_gaps.max():.3f}), while "
+        f"{band_gaps.idxmin()} had the smallest ({band_gaps.min():.3f}). "
+        f"Overall gaps were similar for BCF ({condition_gaps['BCF']:.3f}) "
+        f"and ACF ({condition_gaps['ACF']:.3f}). The largest combined gap "
+        f"was {review_row['Feature_Display']} at {review_row['Channel']} "
+        f"under {review_row['Condition']} in {review_row['Band']} "
+        f"({review_row['Average_Absolute_Summary_Gap']:.3f})."
+    )
+
+
+def get_bcf_acf_synthetic_quality_interpretation(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Explain the currently selected synthetic-quality view."""
+    metric_config = BCF_ACF_SYNTHETIC_METRICS[selected_metric]
+    difference_column = metric_config["difference"]
+    absolute_column = metric_config["absolute"]
+    average_gap = selected_data[absolute_column].mean()
+    median_gap = selected_data[absolute_column].median()
+    review_row = selected_data.loc[selected_data[absolute_column].idxmax()]
+    synthetic_higher = int((selected_data[difference_column] > 0).sum())
+    synthetic_lower = int((selected_data[difference_column] < 0).sum())
+    condition_text = (
+        "BCF and ACF"
+        if selected_condition == "All Conditions"
+        else selected_condition
+    )
+
+    return (
+        f"For {selected_band} across {condition_text}, the average absolute "
+        f"{selected_metric.lower()} gap was {average_gap:.3f}, with a median "
+        f"of {median_gap:.3f}. The largest gap occurred for "
+        f"{review_row['Feature_Display']} at {review_row['Channel']} under "
+        f"{review_row['Condition']} ({review_row[absolute_column]:.3f}). "
+        f"Synthetic values were higher than real values in {synthetic_higher} "
+        f"of {len(selected_data)} summaries and lower in {synthetic_lower}. "
+        "Smaller gaps indicate closer descriptive agreement; they do not by "
+        "themselves establish distributional equivalence."
+    )
+
+
+def build_bcf_acf_synthetic_parity_figure(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Build a Real-versus-Synthetic parity plot for one summary statistic."""
+    metric_config = BCF_ACF_SYNTHETIC_METRICS[selected_metric]
+    real_column = metric_config["real"]
+    synthetic_column = metric_config["synthetic"]
+    figure = go.Figure()
+    conditions = [
+        condition
+        for condition in [
+            "BCF",
+            "ACF",
+            "BF",
+            "AF",
+            "BCM",
+            "ACM",
+            "BM",
+            "AM",
+        ]
+        if condition in set(selected_data["Condition"])
+    ]
+    symbols = {
+        "BCF": "circle",
+        "ACF": "diamond",
+        "BF": "circle",
+        "AF": "diamond",
+        "BCM": "circle",
+        "ACM": "diamond",
+        "BM": "circle",
+        "AM": "diamond",
+    }
+
+    for channel in BCF_ACF_CHANNEL_ORDER:
+        for condition in conditions:
+            trace_data = selected_data[
+                (selected_data["Channel"] == channel)
+                & (selected_data["Condition"] == condition)
+            ]
+            if trace_data.empty:
+                continue
+            trace_name = (
+                f"{channel} · {condition}"
+                if selected_condition == "All Conditions"
+                else channel
+            )
+            figure.add_trace(
+                go.Scatter(
+                    x=trace_data[real_column],
+                    y=trace_data[synthetic_column],
+                    mode="markers",
+                    name=trace_name,
+                    marker={
+                        "size": 11,
+                        "symbol": symbols[condition],
+                        "color": BCF_ACF_PREPOST_CHANNEL_COLORS[channel],
+                        "opacity": 0.82,
+                        "line": {"color": "#F7FAF9", "width": 1.2},
+                    },
+                    customdata=trace_data[
+                        ["Feature_Display", "Condition", "Channel"]
+                    ].values,
+                    hovertemplate=(
+                        "Feature: %{customdata[0]}<br>"
+                        "Condition: %{customdata[1]}<br>"
+                        "Channel: %{customdata[2]}<br>"
+                        "Real: %{x:.4f}<br>Synthetic: %{y:.4f}"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+    combined_values = pd.concat(
+        [selected_data[real_column], selected_data[synthetic_column]],
+        ignore_index=True,
+    )
+    value_min = combined_values.min()
+    value_max = combined_values.max()
+    value_range = value_max - value_min
+    padding = value_range * 0.08 if value_range else 0.1
+    axis_min = value_min - padding
+    axis_max = value_max + padding
+    figure.add_trace(
+        go.Scatter(
+            x=[axis_min, axis_max],
+            y=[axis_min, axis_max],
+            mode="lines",
+            line={"color": "#607D72", "width": 1.5, "dash": "dash"},
+            name="Perfect agreement",
+            hoverinfo="skip",
+        )
+    )
+    figure.update_layout(
+        title=(
+            f"Real vs Synthetic {selected_metric}<br>"
+            f"<sup>{selected_band} · {selected_condition}</sup>"
+        ),
+        xaxis_title=f"Real {selected_metric}",
+        yaxis_title=f"Synthetic {selected_metric}",
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
+    )
+    figure.update_xaxes(range=[axis_min, axis_max])
+    figure.update_yaxes(
+        range=[axis_min, axis_max],
+        scaleanchor="x",
+        scaleratio=1,
+    )
+    return style_bcf_acf_pre_post_figure(figure, 540)
+
+
+def build_bcf_acf_synthetic_gap_heatmap(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Build a channel-by-feature heatmap of absolute summary gaps."""
+    metric_config = BCF_ACF_SYNTHETIC_METRICS[selected_metric]
+    absolute_column = metric_config["absolute"]
+    heatmap_data = (
+        selected_data.groupby(
+            ["Channel", "Feature", "Feature_Display"], observed=True
+        )[absolute_column]
+        .mean()
+        .reset_index()
+    )
+    feature_order = get_bcf_acf_synthetic_feature_order(
+        selected_data, selected_band
+    )
+    display_lookup = (
+        heatmap_data.drop_duplicates("Feature")
+        .set_index("Feature")["Feature_Display"]
+        .to_dict()
+    )
+    pivot = heatmap_data.pivot(
+        index="Channel", columns="Feature", values=absolute_column
+    ).reindex(index=BCF_ACF_CHANNEL_ORDER, columns=feature_order)
+    feature_labels = [display_lookup.get(feature, feature) for feature in feature_order]
+
+    figure = go.Figure(
+        data=go.Heatmap(
+            z=pivot.values,
+            x=feature_labels,
+            y=pivot.index,
+            colorscale=[
+                [0.0, "#F2F8F4"],
+                [0.35, "#B8DFC8"],
+                [0.7, "#66B091"],
+                [1.0, "#2E6D55"],
+            ],
+            text=pivot.round(3).astype(str).values,
+            texttemplate="%{text}",
+            colorbar={"title": "Absolute<br>gap"},
+            hovertemplate=(
+                "Channel: %{y}<br>Feature: %{x}<br>"
+                "Absolute gap: %{z:.4f}<extra></extra>"
+            ),
+        )
+    )
+    figure.update_layout(
+        title=(
+            f"Absolute {selected_metric} Gap by Channel and Feature<br>"
+            f"<sup>{selected_band} · {selected_condition}</sup>"
+        ),
+        xaxis_title="Feature",
+        yaxis_title="EEG Channel",
+    )
+    figure.update_xaxes(tickangle=-18)
+    return style_bcf_acf_pre_post_figure(figure, 430)
+
+
+def build_bcf_acf_synthetic_band_overview(
+    dataframe,
+    selected_condition,
+):
+    """Compare average absolute summary gaps across frequency bands."""
+    overview_data = dataframe.copy()
+    if selected_condition != "All Conditions":
+        overview_data = overview_data[
+            overview_data["Condition"] == selected_condition
+        ]
+    metric_colors = {
+        "Mean": "#6C3FD1",
+        "Standard deviation": "#FF7A00",
+        "Median": "#18B7A0",
+        "IQR": "#2F80ED",
+    }
+    figure = go.Figure()
+    for metric_name, metric_config in BCF_ACF_SYNTHETIC_METRICS.items():
+        summary = (
+            overview_data.groupby("Band", observed=True)[
+                metric_config["absolute"]
+            ]
+            .mean()
+            .reindex(BCF_ACF_BAND_ORDER)
+        )
+        figure.add_trace(
+            go.Bar(
+                x=summary.index,
+                y=summary.values,
+                name=metric_name,
+                marker_color=metric_colors[metric_name],
+                hovertemplate=(
+                    "Band: %{x}<br>Average absolute gap: %{y:.4f}"
+                    "<extra>%{fullData.name}</extra>"
+                ),
+            )
+        )
+    figure.update_layout(
+        title=(
+            "Average Absolute Summary Gap by Frequency Band<br>"
+            f"<sup>{selected_condition}</sup>"
+        ),
+        barmode="group",
+        xaxis_title="Frequency band",
+        yaxis_title="Average absolute gap",
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
+    )
+    return style_bcf_acf_pre_post_figure(figure, 460)
+
+
+def render_bcf_acf_synthetic_feature_quality():
+    """Render BCF-ACF descriptive Real-versus-Synthetic quality analysis."""
+    st.subheader("Synthetic feature quality")
+    st.caption(
+        "Compare Real and ACGAN-generated feature summaries across frequency "
+        "bands, conditions, EEG channels, and feature types."
+    )
+
+    try:
+        dataframe = load_bcf_acf_synthetic_quality()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'synthetic_quality_master BCF ACF.zip' beside app.py, or "
+            "extract its five CSV files into synthetic_quality_master/, "
+            "data/, or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bcf_acf_synthetic_quality_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bcf_acf_synthetic_quality_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BCF", "ACF"],
+            index=0,
+            key="bcf_acf_synthetic_quality_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Summary statistic",
+            list(BCF_ACF_SYNTHETIC_METRICS),
+            index=0,
+            key="bcf_acf_synthetic_quality_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No synthetic-quality rows match the selected filters.")
+        return
+
+    metric_columns = {
+        "Mean": "Abs_Mean_Difference",
+        "SD": "Abs_SD_Difference",
+        "Median": "Abs_Median_Difference",
+        "IQR": "Abs_IQR_Difference",
+    }
+    cards = st.columns(5)
+    cards[0].metric("Summary Rows", len(selected_data))
+    for card, (label, column) in zip(cards[1:], metric_columns.items()):
+        card.metric(f"Avg |{label} Gap|", f"{selected_data[column].mean():.3f}")
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bcf_acf_synthetic_quality_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+        )
+    )
+
+    parity_figure = build_bcf_acf_synthetic_parity_figure(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        parity_figure,
+        use_container_width=True,
+        key="bcf_acf_synthetic_quality_parity",
+    )
+    st.caption(
+        "The dashed diagonal represents exact agreement. Points closer to the "
+        "line have more similar Real and Synthetic summary values."
+    )
+
+    heatmap_figure = build_bcf_acf_synthetic_gap_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bcf_acf_synthetic_quality_heatmap",
+    )
+    st.caption(
+        "Darker cells indicate larger absolute Real-versus-Synthetic gaps. "
+        "When both conditions are selected, each cell is their average."
+    )
+
+    band_figure = build_bcf_acf_synthetic_band_overview(
+        dataframe,
+        selected_condition,
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bcf_acf_synthetic_quality_band_overview",
+    )
+    st.caption(
+        "Band-level bars average the absolute gaps across both conditions, "
+        "all four channels, and all six features unless one condition is "
+        "selected."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    review_table = selected_data.nlargest(
+        10, "Average_Absolute_Summary_Gap"
+    )[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Abs_Mean_Difference",
+            "Abs_SD_Difference",
+            "Abs_Median_Difference",
+            "Abs_IQR_Difference",
+            "Average_Absolute_Summary_Gap",
+        ]
+    ].copy()
+    review_table = review_table.rename(
+        columns={
+            "Feature_Display": "Feature",
+            "Abs_Mean_Difference": "|Mean Gap|",
+            "Abs_SD_Difference": "|SD Gap|",
+            "Abs_Median_Difference": "|Median Gap|",
+            "Abs_IQR_Difference": "|IQR Gap|",
+            "Average_Absolute_Summary_Gap": "Average Absolute Gap",
+        }
+    )
+    numeric_review_columns = [
+        "|Mean Gap|",
+        "|SD Gap|",
+        "|Median Gap|",
+        "|IQR Gap|",
+        "Average Absolute Gap",
+    ]
+    review_table[numeric_review_columns] = review_table[
+        numeric_review_columns
+    ].round(4)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    real_counts = sorted(dataframe["Real_N"].astype(int).unique())
+    synthetic_counts = sorted(dataframe["Synthetic_N"].astype(int).unique())
+    sample_note = (
+        f"Each summary row uses {real_counts[0]:,} Real and "
+        f"{synthetic_counts[0]:,} Synthetic observations. "
+        if len(real_counts) == 1 and len(synthetic_counts) == 1
+        else "Sample counts vary across summary rows. "
+    )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Differences are recalculated as Synthetic minus Real; the table "
+        "ranks rows by the average absolute gap across mean, SD, median, and "
+        "IQR. The source files do not include a predefined feature-quality "
+        "score, so no arbitrary score is introduced here. This descriptive "
+        "summary does not test statistical significance or full distributional "
+        "equivalence. Use the Quantitative Similarity tab for configured "
+        "distance or distribution metrics."
+    )
+
+
+def get_bf_af_synthetic_quality_band_from_name(file_name):
+    """Extract the frequency band from a BF-AF quality filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BF_AF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bf_af_synthetic_quality_source():
+    """Find the BF-AF synthetic-quality ZIP or extracted CSV files."""
+    for zip_path in BF_AF_SYNTHETIC_QUALITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BF_AF_SYNTHETIC_QUALITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "SyntheticQuality_*_FeatureComparison_BF_vs_AF.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bf_af_synthetic_quality():
+    """Load and validate the five BF-AF synthetic-quality tables."""
+    source_type, source = find_bf_af_synthetic_quality_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BF vs AF synthetic-quality data were not found. Keep "
+            "'synthetic_quality_master BF AF.zip' beside app.py, or "
+            "extract its five SyntheticQuality CSV files into "
+            "synthetic_quality_master/, data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "syntheticquality" in name.lower()
+                and "featurecomparison" in name.lower()
+                and "bf" in name.lower()
+                and "af" in name.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bf_af_synthetic_quality_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bf_af_synthetic_quality_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BF vs AF SyntheticQuality FeatureComparison CSV files were "
+            "found in the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BF_AF_SYNTHETIC_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BF vs AF synthetic-quality data are missing required "
+            "columns: " + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Label",
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Real_SD",
+        "Synthetic_SD",
+        "Real_Median",
+        "Synthetic_Median",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Real_N",
+        "Synthetic_N",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BF vs AF synthetic-quality CSV files contain missing or "
+            "non-numeric values in required summary columns."
+        )
+
+    expected_labels = dataframe["Condition"].map({"BF": 0, "AF": 1})
+    if expected_labels.isna().any() or not (
+        dataframe["Label"] == expected_labels
+    ).all():
+        raise ValueError(
+            "Condition and Label are inconsistent. Expected BF = 0 and "
+            "AF = 1 in every synthetic-quality row."
+        )
+
+    for metric_config in BF_AF_SYNTHETIC_METRICS.values():
+        difference_column = metric_config["difference"]
+        absolute_column = metric_config["absolute"]
+        dataframe[difference_column] = (
+            dataframe[metric_config["synthetic"]]
+            - dataframe[metric_config["real"]]
+        )
+        dataframe[absolute_column] = dataframe[difference_column].abs()
+
+    absolute_columns = [
+        metric_config["absolute"]
+        for metric_config in BF_AF_SYNTHETIC_METRICS.values()
+    ]
+    dataframe["Average_Absolute_Summary_Gap"] = dataframe[
+        absolute_columns
+    ].mean(axis=1)
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BF vs AF synthetic-quality data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BF_AF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BF vs AF synthetic-quality data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BF", "AF"}:
+        raise ValueError(
+            "Synthetic-quality data must contain both BF and AF conditions."
+        )
+
+    return dataframe
+
+
+def get_bf_af_synthetic_quality_key_finding(dataframe):
+    """Create the global descriptive BF-AF synthetic-quality finding."""
+    metric_averages = {
+        metric_name: dataframe[metric_config["absolute"]].mean()
+        for metric_name, metric_config in BF_AF_SYNTHETIC_METRICS.items()
+    }
+    largest_metric = max(metric_averages, key=metric_averages.get)
+    band_gaps = dataframe.groupby("Band", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    condition_gaps = dataframe.groupby("Condition", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    review_row = dataframe.loc[
+        dataframe["Average_Absolute_Summary_Gap"].idxmax()
+    ]
+    lower_condition = condition_gaps.idxmin()
+    higher_condition = condition_gaps.idxmax()
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature summaries, "
+        f"the mean absolute gaps were {metric_averages['Mean']:.3f} for the "
+        f"mean, {metric_averages['Standard deviation']:.3f} for SD, "
+        f"{metric_averages['Median']:.3f} for the median, and "
+        f"{metric_averages['IQR']:.3f} for IQR. {largest_metric} showed the "
+        f"largest average discrepancy. {band_gaps.idxmax()} had the largest "
+        f"average summary gap ({band_gaps.max():.3f}), while "
+        f"{band_gaps.idxmin()} had the smallest ({band_gaps.min():.3f}). "
+        f"The combined gap was lower for {lower_condition} "
+        f"({condition_gaps[lower_condition]:.3f}) than for "
+        f"{higher_condition} ({condition_gaps[higher_condition]:.3f}). "
+        f"The largest combined gap was {review_row['Feature_Display']} at "
+        f"{review_row['Channel']} under {review_row['Condition']} in "
+        f"{review_row['Band']} "
+        f"({review_row['Average_Absolute_Summary_Gap']:.3f})."
+    )
+
+
+def get_bf_af_synthetic_quality_interpretation(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Explain the currently selected BF-AF quality view."""
+    metric_config = BF_AF_SYNTHETIC_METRICS[selected_metric]
+    difference_column = metric_config["difference"]
+    absolute_column = metric_config["absolute"]
+    average_gap = selected_data[absolute_column].mean()
+    median_gap = selected_data[absolute_column].median()
+    review_row = selected_data.loc[selected_data[absolute_column].idxmax()]
+    synthetic_higher = int((selected_data[difference_column] > 0).sum())
+    synthetic_lower = int((selected_data[difference_column] < 0).sum())
+    condition_text = (
+        "BF and AF"
+        if selected_condition == "All Conditions"
+        else selected_condition
+    )
+
+    return (
+        f"For {selected_band} across {condition_text}, the average absolute "
+        f"{selected_metric.lower()} gap was {average_gap:.3f}, with a median "
+        f"of {median_gap:.3f}. The largest gap occurred for "
+        f"{review_row['Feature_Display']} at {review_row['Channel']} under "
+        f"{review_row['Condition']} ({review_row[absolute_column]:.3f}). "
+        f"Synthetic values were higher than real values in "
+        f"{synthetic_higher} of {len(selected_data)} summaries and lower in "
+        f"{synthetic_lower}. Smaller gaps indicate closer descriptive "
+        "agreement; they do not by themselves establish distributional "
+        "equivalence."
+    )
+
+
+def render_bf_af_synthetic_feature_quality():
+    """Render BF-AF descriptive Real-versus-Synthetic quality analysis."""
+    st.subheader("Synthetic feature quality")
+    st.caption(
+        "Compare Real and ACGAN-generated feature summaries across frequency "
+        "bands, BF/AF conditions, EEG channels, and feature types."
+    )
+
+    try:
+        dataframe = load_bf_af_synthetic_quality()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'synthetic_quality_master BF AF.zip' beside app.py, or "
+            "extract its five CSV files into synthetic_quality_master/, "
+            "data/, or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bf_af_synthetic_quality_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BF_AF_BAND_ORDER,
+            index=0,
+            key="bf_af_synthetic_quality_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BF", "AF"],
+            index=0,
+            key="bf_af_synthetic_quality_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Summary statistic",
+            list(BF_AF_SYNTHETIC_METRICS),
+            index=0,
+            key="bf_af_synthetic_quality_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No synthetic-quality rows match the selected filters.")
+        return
+
+    metric_columns = {
+        "Mean": "Abs_Mean_Difference",
+        "SD": "Abs_SD_Difference",
+        "Median": "Abs_Median_Difference",
+        "IQR": "Abs_IQR_Difference",
+    }
+    cards = st.columns(5)
+    cards[0].metric("Summary Rows", len(selected_data))
+    for card, (label, column) in zip(cards[1:], metric_columns.items()):
+        card.metric(f"Avg |{label} Gap|", f"{selected_data[column].mean():.3f}")
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bf_af_synthetic_quality_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+        )
+    )
+
+    parity_figure = build_bcf_acf_synthetic_parity_figure(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        parity_figure,
+        use_container_width=True,
+        key="bf_af_synthetic_quality_parity",
+    )
+    st.caption(
+        "The dashed diagonal represents exact agreement. Points closer to the "
+        "line have more similar Real and Synthetic summary values."
+    )
+
+    heatmap_figure = build_bcf_acf_synthetic_gap_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bf_af_synthetic_quality_heatmap",
+    )
+    st.caption(
+        "Darker cells indicate larger absolute Real-versus-Synthetic gaps. "
+        "When both conditions are selected, each cell is their average."
+    )
+
+    band_figure = build_bcf_acf_synthetic_band_overview(
+        dataframe,
+        selected_condition,
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bf_af_synthetic_quality_band_overview",
+    )
+    st.caption(
+        "Band-level bars average the absolute gaps across both conditions, "
+        "all four channels, and all six features unless one condition is "
+        "selected."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    review_table = selected_data.nlargest(
+        10, "Average_Absolute_Summary_Gap"
+    )[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Abs_Mean_Difference",
+            "Abs_SD_Difference",
+            "Abs_Median_Difference",
+            "Abs_IQR_Difference",
+            "Average_Absolute_Summary_Gap",
+        ]
+    ].copy()
+    review_table = review_table.rename(
+        columns={
+            "Feature_Display": "Feature",
+            "Abs_Mean_Difference": "|Mean Gap|",
+            "Abs_SD_Difference": "|SD Gap|",
+            "Abs_Median_Difference": "|Median Gap|",
+            "Abs_IQR_Difference": "|IQR Gap|",
+            "Average_Absolute_Summary_Gap": "Average Absolute Gap",
+        }
+    )
+    numeric_review_columns = [
+        "|Mean Gap|",
+        "|SD Gap|",
+        "|Median Gap|",
+        "|IQR Gap|",
+        "Average Absolute Gap",
+    ]
+    review_table[numeric_review_columns] = review_table[
+        numeric_review_columns
+    ].round(4)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    real_counts = sorted(dataframe["Real_N"].astype(int).unique())
+    synthetic_counts = sorted(dataframe["Synthetic_N"].astype(int).unique())
+    sample_note = (
+        f"Each summary row uses {real_counts[0]:,} Real and "
+        f"{synthetic_counts[0]:,} Synthetic observations. "
+        if len(real_counts) == 1 and len(synthetic_counts) == 1
+        else "Sample counts vary across summary rows. "
+    )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Differences are recalculated as Synthetic minus Real; the table "
+        "ranks rows by the average absolute gap across mean, SD, median, and "
+        "IQR. The source files do not include a predefined feature-quality "
+        "score, so no arbitrary score is introduced here. This descriptive "
+        "summary does not test statistical significance or full distributional "
+        "equivalence. Use the Quantitative Similarity tab for configured "
+        "distance or distribution metrics."
+    )
+
+
+def get_bcm_acm_synthetic_quality_band_from_name(file_name):
+    """Extract the frequency band from a BCM-ACM quality filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCM_ACM_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bcm_acm_synthetic_quality_source():
+    """Find the BCM-ACM synthetic-quality ZIP or extracted CSV files."""
+    for zip_path in BCM_ACM_SYNTHETIC_QUALITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BCM_ACM_SYNTHETIC_QUALITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "SyntheticQuality_*_FeatureComparison_BCM_vs_ACM.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bcm_acm_synthetic_quality():
+    """Load and validate the five BCM-ACM synthetic-quality tables."""
+    source_type, source = find_bcm_acm_synthetic_quality_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BCM vs ACM synthetic-quality data were not found. Keep "
+            "'synthetic_quality_master BCM ACM.zip' beside app.py, or "
+            "extract its five SyntheticQuality CSV files into "
+            "synthetic_quality_master/, data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "syntheticquality" in name.lower()
+                and "featurecomparison" in name.lower()
+                and "bcm" in name.lower()
+                and "acm" in name.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bcm_acm_synthetic_quality_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcm_acm_synthetic_quality_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BCM vs ACM SyntheticQuality FeatureComparison CSV files "
+            "were found in the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BCM_ACM_SYNTHETIC_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BCM vs ACM synthetic-quality data are missing required "
+            "columns: " + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+
+    # The supplied Delta CSV labels its two band-specific fields as Alpha_BP
+    # and Alpha_RP. Preserve the original label and correct only the dashboard
+    # display key according to the frequency band encoded in the source file.
+    dataframe["Source_Feature"] = dataframe["Feature"]
+    delta_label_mask = (
+        (dataframe["Band"] == "Delta")
+        & dataframe["Feature"].isin(["Alpha_BP", "Alpha_RP"])
+    )
+    dataframe["Feature_Label_Corrected"] = delta_label_mask
+    dataframe.loc[delta_label_mask, "Feature"] = dataframe.loc[
+        delta_label_mask, "Feature"
+    ].replace({"Alpha_BP": "Delta_BP", "Alpha_RP": "Delta_RP"})
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Label",
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Real_SD",
+        "Synthetic_SD",
+        "Real_Median",
+        "Synthetic_Median",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Real_N",
+        "Synthetic_N",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BCM vs ACM synthetic-quality CSV files contain missing or "
+            "non-numeric values in required summary columns."
+        )
+
+    expected_labels = dataframe["Condition"].map({"BCM": 0, "ACM": 1})
+    if expected_labels.isna().any() or not (
+        dataframe["Label"] == expected_labels
+    ).all():
+        raise ValueError(
+            "Condition and Label are inconsistent. Expected BCM = 0 and "
+            "ACM = 1 in every synthetic-quality row."
+        )
+
+    for metric_config in BCM_ACM_SYNTHETIC_METRICS.values():
+        difference_column = metric_config["difference"]
+        absolute_column = metric_config["absolute"]
+        dataframe[difference_column] = (
+            dataframe[metric_config["synthetic"]]
+            - dataframe[metric_config["real"]]
+        )
+        dataframe[absolute_column] = dataframe[difference_column].abs()
+
+    absolute_columns = [
+        metric_config["absolute"]
+        for metric_config in BCM_ACM_SYNTHETIC_METRICS.values()
+    ]
+    dataframe["Average_Absolute_Summary_Gap"] = dataframe[
+        absolute_columns
+    ].mean(axis=1)
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BCM vs ACM synthetic-quality data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BCM_ACM_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BCM vs ACM synthetic-quality data are incomplete. Missing "
+            "bands: " + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BCM", "ACM"}:
+        raise ValueError(
+            "Synthetic-quality data must contain both BCM and ACM conditions."
+        )
+
+    expected_band_features = {
+        band: {f"{band}_BP", f"{band}_RP"}
+        for band in BCM_ACM_BAND_ORDER
+    }
+    incomplete_feature_bands = [
+        band
+        for band, expected_features in expected_band_features.items()
+        if not expected_features.issubset(
+            set(dataframe.loc[dataframe["Band"] == band, "Feature"])
+        )
+    ]
+    if incomplete_feature_bands:
+        raise ValueError(
+            "Band-specific BP/RP labels are incomplete for: "
+            + ", ".join(incomplete_feature_bands)
+        )
+
+    return dataframe
+
+
+def get_bcm_acm_synthetic_quality_key_finding(dataframe):
+    """Create the global descriptive BCM-ACM synthetic-quality finding."""
+    metric_averages = {
+        metric_name: dataframe[metric_config["absolute"]].mean()
+        for metric_name, metric_config in BCM_ACM_SYNTHETIC_METRICS.items()
+    }
+    largest_metric = max(metric_averages, key=metric_averages.get)
+    band_gaps = dataframe.groupby("Band", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    condition_gaps = dataframe.groupby("Condition", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    review_row = dataframe.loc[
+        dataframe["Average_Absolute_Summary_Gap"].idxmax()
+    ]
+    lower_condition = condition_gaps.idxmin()
+    higher_condition = condition_gaps.idxmax()
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature summaries, "
+        f"the mean absolute gaps were {metric_averages['Mean']:.3f} for the "
+        f"mean, {metric_averages['Standard deviation']:.3f} for SD, "
+        f"{metric_averages['Median']:.3f} for the median, and "
+        f"{metric_averages['IQR']:.3f} for IQR. {largest_metric} showed the "
+        f"largest average discrepancy. {band_gaps.idxmax()} had the largest "
+        f"average summary gap ({band_gaps.max():.3f}), while "
+        f"{band_gaps.idxmin()} had the smallest ({band_gaps.min():.3f}). "
+        f"The combined gap was lower for {lower_condition} "
+        f"({condition_gaps[lower_condition]:.3f}) than for "
+        f"{higher_condition} ({condition_gaps[higher_condition]:.3f}). "
+        f"The largest combined gap was {review_row['Feature_Display']} at "
+        f"{review_row['Channel']} under {review_row['Condition']} in "
+        f"{review_row['Band']} "
+        f"({review_row['Average_Absolute_Summary_Gap']:.3f})."
+    )
+
+
+def get_bcm_acm_synthetic_quality_interpretation(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Explain the currently selected BCM-ACM quality view."""
+    metric_config = BCM_ACM_SYNTHETIC_METRICS[selected_metric]
+    difference_column = metric_config["difference"]
+    absolute_column = metric_config["absolute"]
+    average_gap = selected_data[absolute_column].mean()
+    median_gap = selected_data[absolute_column].median()
+    review_row = selected_data.loc[selected_data[absolute_column].idxmax()]
+    synthetic_higher = int((selected_data[difference_column] > 0).sum())
+    synthetic_lower = int((selected_data[difference_column] < 0).sum())
+    condition_text = (
+        "BCM and ACM"
+        if selected_condition == "All Conditions"
+        else selected_condition
+    )
+
+    return (
+        f"For {selected_band} across {condition_text}, the average absolute "
+        f"{selected_metric.lower()} gap was {average_gap:.3f}, with a median "
+        f"of {median_gap:.3f}. The largest gap occurred for "
+        f"{review_row['Feature_Display']} at {review_row['Channel']} under "
+        f"{review_row['Condition']} ({review_row[absolute_column]:.3f}). "
+        f"Synthetic values were higher than real values in "
+        f"{synthetic_higher} of {len(selected_data)} summaries and lower in "
+        f"{synthetic_lower}. Smaller gaps indicate closer descriptive "
+        "agreement; they do not by themselves establish distributional "
+        "equivalence."
+    )
+
+
+def render_bcm_acm_synthetic_feature_quality():
+    """Render BCM-ACM descriptive Real-versus-Synthetic quality analysis."""
+    st.subheader("Synthetic feature quality")
+    st.caption(
+        "Compare Real and ACGAN-generated feature summaries across frequency "
+        "bands, BCM/ACM conditions, EEG channels, and feature types."
+    )
+
+    try:
+        dataframe = load_bcm_acm_synthetic_quality()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'synthetic_quality_master BCM ACM.zip' beside app.py, or "
+            "extract its five CSV files into synthetic_quality_master/, "
+            "data/, or assets/data/, then redeploy the application."
+        )
+        return
+
+    corrected_labels = int(dataframe["Feature_Label_Corrected"].sum())
+    if corrected_labels:
+        st.warning(
+            "**Source-label note.** The Delta CSV labels its band-specific "
+            f"features as Alpha_BP and Alpha_RP in {corrected_labels} rows. "
+            "The dashboard displays them as Delta_BP and Delta_RP according "
+            "to the source filename; all numeric values remain unchanged."
+        )
+
+    st.success(
+        "**Key finding.** "
+        + get_bcm_acm_synthetic_quality_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCM_ACM_BAND_ORDER,
+            index=0,
+            key="bcm_acm_synthetic_quality_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BCM", "ACM"],
+            index=0,
+            key="bcm_acm_synthetic_quality_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Summary statistic",
+            list(BCM_ACM_SYNTHETIC_METRICS),
+            index=0,
+            key="bcm_acm_synthetic_quality_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No synthetic-quality rows match the selected filters.")
+        return
+
+    metric_columns = {
+        "Mean": "Abs_Mean_Difference",
+        "SD": "Abs_SD_Difference",
+        "Median": "Abs_Median_Difference",
+        "IQR": "Abs_IQR_Difference",
+    }
+    cards = st.columns(5)
+    cards[0].metric("Summary Rows", len(selected_data))
+    for card, (label, column) in zip(cards[1:], metric_columns.items()):
+        card.metric(f"Avg |{label} Gap|", f"{selected_data[column].mean():.3f}")
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bcm_acm_synthetic_quality_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+        )
+    )
+
+    parity_figure = build_bcf_acf_synthetic_parity_figure(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        parity_figure,
+        use_container_width=True,
+        key="bcm_acm_synthetic_quality_parity",
+    )
+    st.caption(
+        "The dashed diagonal represents exact agreement. Points closer to the "
+        "line have more similar Real and Synthetic summary values."
+    )
+
+    heatmap_figure = build_bcf_acf_synthetic_gap_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bcm_acm_synthetic_quality_heatmap",
+    )
+    st.caption(
+        "Darker cells indicate larger absolute Real-versus-Synthetic gaps. "
+        "When both conditions are selected, each cell is their average."
+    )
+
+    band_figure = build_bcf_acf_synthetic_band_overview(
+        dataframe,
+        selected_condition,
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bcm_acm_synthetic_quality_band_overview",
+    )
+    st.caption(
+        "Band-level bars average the absolute gaps across both conditions, "
+        "all four channels, and all six features unless one condition is "
+        "selected."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    review_table = selected_data.nlargest(
+        10, "Average_Absolute_Summary_Gap"
+    )[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Abs_Mean_Difference",
+            "Abs_SD_Difference",
+            "Abs_Median_Difference",
+            "Abs_IQR_Difference",
+            "Average_Absolute_Summary_Gap",
+        ]
+    ].copy()
+    review_table = review_table.rename(
+        columns={
+            "Feature_Display": "Feature",
+            "Abs_Mean_Difference": "|Mean Gap|",
+            "Abs_SD_Difference": "|SD Gap|",
+            "Abs_Median_Difference": "|Median Gap|",
+            "Abs_IQR_Difference": "|IQR Gap|",
+            "Average_Absolute_Summary_Gap": "Average Absolute Gap",
+        }
+    )
+    numeric_review_columns = [
+        "|Mean Gap|",
+        "|SD Gap|",
+        "|Median Gap|",
+        "|IQR Gap|",
+        "Average Absolute Gap",
+    ]
+    review_table[numeric_review_columns] = review_table[
+        numeric_review_columns
+    ].round(4)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    real_counts = sorted(dataframe["Real_N"].astype(int).unique())
+    synthetic_counts = sorted(dataframe["Synthetic_N"].astype(int).unique())
+    sample_note = (
+        f"Each summary row uses {real_counts[0]:,} Real and "
+        f"{synthetic_counts[0]:,} Synthetic observations. "
+        if len(real_counts) == 1 and len(synthetic_counts) == 1
+        else "Sample counts vary across summary rows. "
+    )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Differences are recalculated as Synthetic minus Real; the table "
+        "ranks rows by the average absolute gap across mean, SD, median, and "
+        "IQR. The source files do not include a predefined feature-quality "
+        "score, so no arbitrary score is introduced here. This descriptive "
+        "summary does not test statistical significance or full distributional "
+        "equivalence. Use the Quantitative Similarity tab for configured "
+        "distance or distribution metrics."
+    )
+
+
+def get_bm_am_synthetic_quality_band_from_name(file_name):
+    """Extract the frequency band from a BM-AM quality filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BM_AM_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bm_am_synthetic_quality_source():
+    """Find the BM-AM synthetic-quality ZIP or extracted CSV files."""
+    for zip_path in BM_AM_SYNTHETIC_QUALITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BM_AM_SYNTHETIC_QUALITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "SyntheticQuality_*_FeatureComparison_BM_vs_AM.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bm_am_synthetic_quality():
+    """Load and validate the five BM-AM synthetic-quality tables."""
+    source_type, source = find_bm_am_synthetic_quality_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BM vs AM synthetic-quality data were not found. Keep "
+            "'synthetic_quality_master BM AM.zip' beside app.py, or "
+            "extract its five SyntheticQuality CSV files into "
+            "synthetic_quality_master/, data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "syntheticquality" in name.lower()
+                and "featurecomparison" in name.lower()
+                and "bm" in name.lower()
+                and "am" in name.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bm_am_synthetic_quality_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bm_am_synthetic_quality_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BM vs AM SyntheticQuality FeatureComparison CSV files were "
+            "found in the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BM_AM_SYNTHETIC_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BM vs AM synthetic-quality data are missing required "
+            "columns: " + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Label",
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Real_SD",
+        "Synthetic_SD",
+        "Real_Median",
+        "Synthetic_Median",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Real_N",
+        "Synthetic_N",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BM vs AM synthetic-quality CSV files contain missing or "
+            "non-numeric values in required summary columns."
+        )
+
+    expected_labels = dataframe["Condition"].map({"BM": 0, "AM": 1})
+    if expected_labels.isna().any() or not (
+        dataframe["Label"] == expected_labels
+    ).all():
+        raise ValueError(
+            "Condition and Label are inconsistent. Expected BM = 0 and "
+            "AM = 1 in every synthetic-quality row."
+        )
+
+    for metric_config in BM_AM_SYNTHETIC_METRICS.values():
+        difference_column = metric_config["difference"]
+        absolute_column = metric_config["absolute"]
+        dataframe[difference_column] = (
+            dataframe[metric_config["synthetic"]]
+            - dataframe[metric_config["real"]]
+        )
+        dataframe[absolute_column] = dataframe[difference_column].abs()
+
+    absolute_columns = [
+        metric_config["absolute"]
+        for metric_config in BM_AM_SYNTHETIC_METRICS.values()
+    ]
+    dataframe["Average_Absolute_Summary_Gap"] = dataframe[
+        absolute_columns
+    ].mean(axis=1)
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BM vs AM synthetic-quality data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BM_AM_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BM vs AM synthetic-quality data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BM", "AM"}:
+        raise ValueError(
+            "Synthetic-quality data must contain both BM and AM conditions."
+        )
+
+    expected_band_features = {
+        band: {f"{band}_BP", f"{band}_RP"}
+        for band in BM_AM_BAND_ORDER
+    }
+    incomplete_feature_bands = [
+        band
+        for band, expected_features in expected_band_features.items()
+        if not expected_features.issubset(
+            set(dataframe.loc[dataframe["Band"] == band, "Feature"])
+        )
+    ]
+    if incomplete_feature_bands:
+        raise ValueError(
+            "Band-specific BP/RP labels are incomplete for: "
+            + ", ".join(incomplete_feature_bands)
+        )
+
+    return dataframe
+
+
+def get_bm_am_synthetic_quality_key_finding(dataframe):
+    """Create the global descriptive BM-AM synthetic-quality finding."""
+    metric_averages = {
+        metric_name: dataframe[metric_config["absolute"]].mean()
+        for metric_name, metric_config in BM_AM_SYNTHETIC_METRICS.items()
+    }
+    largest_metric = max(metric_averages, key=metric_averages.get)
+    band_gaps = dataframe.groupby("Band", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    condition_gaps = dataframe.groupby("Condition", observed=True)[
+        "Average_Absolute_Summary_Gap"
+    ].mean()
+    review_row = dataframe.loc[
+        dataframe["Average_Absolute_Summary_Gap"].idxmax()
+    ]
+    lower_condition = condition_gaps.idxmin()
+    higher_condition = condition_gaps.idxmax()
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature summaries, "
+        f"the mean absolute gaps were {metric_averages['Mean']:.3f} for the "
+        f"mean, {metric_averages['Standard deviation']:.3f} for SD, "
+        f"{metric_averages['Median']:.3f} for the median, and "
+        f"{metric_averages['IQR']:.3f} for IQR. {largest_metric} showed the "
+        f"largest average discrepancy. {band_gaps.idxmax()} had the largest "
+        f"average summary gap ({band_gaps.max():.3f}), while "
+        f"{band_gaps.idxmin()} had the smallest ({band_gaps.min():.3f}). "
+        f"The combined gap was lower for {lower_condition} "
+        f"({condition_gaps[lower_condition]:.3f}) than for "
+        f"{higher_condition} ({condition_gaps[higher_condition]:.3f}). "
+        f"The largest combined gap was {review_row['Feature_Display']} at "
+        f"{review_row['Channel']} under {review_row['Condition']} in "
+        f"{review_row['Band']} "
+        f"({review_row['Average_Absolute_Summary_Gap']:.3f})."
+    )
+
+
+def get_bm_am_synthetic_quality_interpretation(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Explain the currently selected BM-AM quality view."""
+    metric_config = BM_AM_SYNTHETIC_METRICS[selected_metric]
+    difference_column = metric_config["difference"]
+    absolute_column = metric_config["absolute"]
+    average_gap = selected_data[absolute_column].mean()
+    median_gap = selected_data[absolute_column].median()
+    review_row = selected_data.loc[selected_data[absolute_column].idxmax()]
+    synthetic_higher = int((selected_data[difference_column] > 0).sum())
+    synthetic_lower = int((selected_data[difference_column] < 0).sum())
+    condition_text = (
+        "BM and AM"
+        if selected_condition == "All Conditions"
+        else selected_condition
+    )
+
+    return (
+        f"For {selected_band} across {condition_text}, the average absolute "
+        f"{selected_metric.lower()} gap was {average_gap:.3f}, with a median "
+        f"of {median_gap:.3f}. The largest gap occurred for "
+        f"{review_row['Feature_Display']} at {review_row['Channel']} under "
+        f"{review_row['Condition']} ({review_row[absolute_column]:.3f}). "
+        f"Synthetic values were higher than real values in "
+        f"{synthetic_higher} of {len(selected_data)} summaries and lower in "
+        f"{synthetic_lower}. Smaller gaps indicate closer descriptive "
+        "agreement; they do not by themselves establish distributional "
+        "equivalence."
+    )
+
+
+def render_bm_am_synthetic_feature_quality():
+    """Render BM-AM descriptive Real-versus-Synthetic quality analysis."""
+    st.subheader("Synthetic feature quality")
+    st.caption(
+        "Compare Real and ACGAN-generated feature summaries across frequency "
+        "bands, BM/AM conditions, EEG channels, and feature types."
+    )
+
+    try:
+        dataframe = load_bm_am_synthetic_quality()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'synthetic_quality_master BM AM.zip' beside app.py, or "
+            "extract its five CSV files into synthetic_quality_master/, "
+            "data/, or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bm_am_synthetic_quality_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BM_AM_BAND_ORDER,
+            index=0,
+            key="bm_am_synthetic_quality_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BM", "AM"],
+            index=0,
+            key="bm_am_synthetic_quality_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Summary statistic",
+            list(BM_AM_SYNTHETIC_METRICS),
+            index=0,
+            key="bm_am_synthetic_quality_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No synthetic-quality rows match the selected filters.")
+        return
+
+    metric_columns = {
+        "Mean": "Abs_Mean_Difference",
+        "SD": "Abs_SD_Difference",
+        "Median": "Abs_Median_Difference",
+        "IQR": "Abs_IQR_Difference",
+    }
+    cards = st.columns(5)
+    cards[0].metric("Summary Rows", len(selected_data))
+    for card, (label, column) in zip(cards[1:], metric_columns.items()):
+        card.metric(f"Avg |{label} Gap|", f"{selected_data[column].mean():.3f}")
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bm_am_synthetic_quality_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+        )
+    )
+
+    parity_figure = build_bcf_acf_synthetic_parity_figure(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        parity_figure,
+        use_container_width=True,
+        key="bm_am_synthetic_quality_parity",
+    )
+    st.caption(
+        "The dashed diagonal represents exact agreement. Points closer to the "
+        "line have more similar Real and Synthetic summary values."
+    )
+
+    heatmap_figure = build_bcf_acf_synthetic_gap_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bm_am_synthetic_quality_heatmap",
+    )
+    st.caption(
+        "Darker cells indicate larger absolute Real-versus-Synthetic gaps. "
+        "When both conditions are selected, each cell is their average."
+    )
+
+    band_figure = build_bcf_acf_synthetic_band_overview(
+        dataframe,
+        selected_condition,
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bm_am_synthetic_quality_band_overview",
+    )
+    st.caption(
+        "Band-level bars average the absolute gaps across both conditions, "
+        "all four channels, and all six features unless one condition is "
+        "selected."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    review_table = selected_data.nlargest(
+        10, "Average_Absolute_Summary_Gap"
+    )[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Abs_Mean_Difference",
+            "Abs_SD_Difference",
+            "Abs_Median_Difference",
+            "Abs_IQR_Difference",
+            "Average_Absolute_Summary_Gap",
+        ]
+    ].copy()
+    review_table = review_table.rename(
+        columns={
+            "Feature_Display": "Feature",
+            "Abs_Mean_Difference": "|Mean Gap|",
+            "Abs_SD_Difference": "|SD Gap|",
+            "Abs_Median_Difference": "|Median Gap|",
+            "Abs_IQR_Difference": "|IQR Gap|",
+            "Average_Absolute_Summary_Gap": "Average Absolute Gap",
+        }
+    )
+    numeric_review_columns = [
+        "|Mean Gap|",
+        "|SD Gap|",
+        "|Median Gap|",
+        "|IQR Gap|",
+        "Average Absolute Gap",
+    ]
+    review_table[numeric_review_columns] = review_table[
+        numeric_review_columns
+    ].round(4)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    real_counts = sorted(dataframe["Real_N"].astype(int).unique())
+    synthetic_counts = sorted(dataframe["Synthetic_N"].astype(int).unique())
+    sample_note = (
+        f"Each summary row uses {real_counts[0]:,} Real and "
+        f"{synthetic_counts[0]:,} Synthetic observations. "
+        if len(real_counts) == 1 and len(synthetic_counts) == 1
+        else "Sample counts vary across summary rows. "
+    )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Differences are recalculated as Synthetic minus Real; the table "
+        "ranks rows by the average absolute gap across mean, SD, median, and "
+        "IQR. The source files do not include a predefined feature-quality "
+        "score, so no arbitrary score is introduced here. This descriptive "
+        "summary does not test statistical significance or full distributional "
+        "equivalence. Use the Quantitative Similarity tab for configured "
+        "distance or distribution metrics."
+    )
+
+
+def get_bcf_acf_similarity_band_from_name(file_name):
+    """Extract the frequency band from a BCF-ACF similarity filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCF_ACF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bcf_acf_similarity_source():
+    """Find the BCF-ACF similarity ZIP or extracted CSV files."""
+    for zip_path in BCF_ACF_SIMILARITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BCF_ACF_SIMILARITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "QuantitativeSimilarity_MASTER_*_BCF_vs_ACF.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bcf_acf_similarity():
+    """Load and validate the five BCF-ACF quantitative-similarity tables."""
+    source_type, source = find_bcf_acf_similarity_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BCF vs ACF quantitative-similarity data were not found. Keep "
+            "'similarity_master BCF ACF.zip' beside app.py, or extract its "
+            "five QuantitativeSimilarity CSV files into similarity_master/, "
+            "data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "quantitativesimilarity" in name.lower()
+                and "bcf" in name.lower()
+                and "acf" in name.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bcf_acf_similarity_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcf_acf_similarity_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BCF vs ACF QuantitativeSimilarity CSV files were found in "
+            "the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BCF_ACF_SIMILARITY_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BCF vs ACF similarity data are missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Mean_Difference",
+        "Real_SD",
+        "Synthetic_SD",
+        "SD_Difference",
+        "Real_Median",
+        "Synthetic_Median",
+        "Median_Difference",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Correlation",
+        "RMSE",
+        "DTW",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BCF vs ACF similarity CSV files contain missing or "
+            "non-numeric values in required metric columns."
+        )
+
+    for optional_column in ["Label", "Real_N", "Synthetic_N"]:
+        if optional_column in dataframe.columns:
+            dataframe[optional_column] = pd.to_numeric(
+                dataframe[optional_column], errors="coerce"
+            )
+
+    difference_checks = [
+        ("Mean_Difference", "Real_Mean", "Synthetic_Mean"),
+        ("SD_Difference", "Real_SD", "Synthetic_SD"),
+        ("Median_Difference", "Real_Median", "Synthetic_Median"),
+    ]
+    for difference_column, real_column, synthetic_column in difference_checks:
+        recalculated = (
+            dataframe[synthetic_column] - dataframe[real_column]
+        )
+        mismatch = (dataframe[difference_column] - recalculated).abs() > 1e-9
+        if mismatch.any():
+            raise ValueError(
+                f"{difference_column} is inconsistent with Synthetic minus "
+                "Real in the BCF vs ACF similarity data."
+            )
+
+    if ((dataframe["Correlation"] < -1) | (dataframe["Correlation"] > 1)).any():
+        raise ValueError("Correlation values must remain between -1 and 1.")
+    if (dataframe[["RMSE", "DTW"]] < 0).any().any():
+        raise ValueError("RMSE and DTW distances cannot be negative.")
+
+    if "Label" in dataframe.columns:
+        labelled_rows = dataframe["Label"].notna()
+        expected_labels = dataframe.loc[labelled_rows, "Condition"].map(
+            {"BCF": 0, "ACF": 1}
+        )
+        if expected_labels.isna().any() or not (
+            dataframe.loc[labelled_rows, "Label"] == expected_labels
+        ).all():
+            raise ValueError(
+                "Available Condition and Label values are inconsistent. "
+                "Expected BCF = 0 and ACF = 1."
+            )
+
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_rows = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        if (dataframe.loc[count_rows, ["Real_N", "Synthetic_N"]] <= 0).any().any():
+            raise ValueError("Available Real_N and Synthetic_N values must be positive.")
+        if not (
+            dataframe.loc[count_rows, "Real_N"]
+            == dataframe.loc[count_rows, "Synthetic_N"]
+        ).all():
+            raise ValueError(
+                "Available Real_N and Synthetic_N values must be paired."
+            )
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BCF vs ACF similarity data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BCF_ACF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BCF vs ACF similarity data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BCF", "ACF"}:
+        raise ValueError(
+            "Similarity data must contain both BCF and ACF conditions."
+        )
+
+    expected_band_features = {
+        band: {f"{band}_BP", f"{band}_RP"}
+        for band in BCF_ACF_BAND_ORDER
+    }
+    incomplete_feature_bands = [
+        band
+        for band, expected_features in expected_band_features.items()
+        if not expected_features.issubset(
+            set(dataframe.loc[dataframe["Band"] == band, "Feature"])
+        )
+    ]
+    if incomplete_feature_bands:
+        raise ValueError(
+            "Band-specific BP/RP labels are incomplete for: "
+            + ", ".join(incomplete_feature_bands)
+        )
+
+    return dataframe
+
+
+def get_bf_af_similarity_band_from_name(file_name):
+    """Extract the frequency band from a BF-AF similarity filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCF_ACF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bf_af_similarity_source():
+    """Find the BF-AF similarity ZIP or extracted CSV files."""
+    for zip_path in BF_AF_SIMILARITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BF_AF_SIMILARITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob("QuantitativeSimilarity_MASTER_*_BF_vs_AF.csv")
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bf_af_similarity():
+    """Load and validate the five BF-AF quantitative-similarity tables."""
+    source_type, source = find_bf_af_similarity_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BF vs AF quantitative-similarity data were not found. Keep "
+            "'similarity_master BF AF.zip' beside app.py, or extract its "
+            "five QuantitativeSimilarity CSV files into similarity_master/, "
+            "data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "quantitativesimilarity" in name.lower()
+                and "_bf_vs_af" in Path(name).stem.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bf_af_similarity_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bf_af_similarity_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BF vs AF QuantitativeSimilarity CSV files were found in "
+            "the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BCF_ACF_SIMILARITY_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BF vs AF similarity data are missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Mean_Difference",
+        "Real_SD",
+        "Synthetic_SD",
+        "SD_Difference",
+        "Real_Median",
+        "Synthetic_Median",
+        "Median_Difference",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Correlation",
+        "RMSE",
+        "DTW",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BF vs AF similarity CSV files contain missing or "
+            "non-numeric values in required metric columns."
+        )
+
+    for optional_column in ["Label", "Real_N", "Synthetic_N"]:
+        if optional_column in dataframe.columns:
+            dataframe[optional_column] = pd.to_numeric(
+                dataframe[optional_column], errors="coerce"
+            )
+
+    difference_checks = [
+        ("Mean_Difference", "Real_Mean", "Synthetic_Mean"),
+        ("SD_Difference", "Real_SD", "Synthetic_SD"),
+        ("Median_Difference", "Real_Median", "Synthetic_Median"),
+    ]
+    for difference_column, real_column, synthetic_column in difference_checks:
+        recalculated = dataframe[synthetic_column] - dataframe[real_column]
+        mismatch = (dataframe[difference_column] - recalculated).abs() > 1e-9
+        if mismatch.any():
+            raise ValueError(
+                f"{difference_column} is inconsistent with Synthetic minus "
+                "Real in the BF vs AF similarity data."
+            )
+
+    if ((dataframe["Correlation"] < -1) | (dataframe["Correlation"] > 1)).any():
+        raise ValueError("Correlation values must remain between -1 and 1.")
+    if (dataframe[["RMSE", "DTW"]] < 0).any().any():
+        raise ValueError("RMSE and DTW distances cannot be negative.")
+
+    if "Label" in dataframe.columns:
+        labelled_rows = dataframe["Label"].notna()
+        expected_labels = dataframe.loc[labelled_rows, "Condition"].map(
+            {"BF": 0, "AF": 1}
+        )
+        if expected_labels.isna().any() or not (
+            dataframe.loc[labelled_rows, "Label"] == expected_labels
+        ).all():
+            raise ValueError(
+                "Available Condition and Label values are inconsistent. "
+                "Expected BF = 0 and AF = 1."
+            )
+
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_rows = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        if (dataframe.loc[count_rows, ["Real_N", "Synthetic_N"]] <= 0).any().any():
+            raise ValueError("Available Real_N and Synthetic_N values must be positive.")
+        if not (
+            dataframe.loc[count_rows, "Real_N"]
+            == dataframe.loc[count_rows, "Synthetic_N"]
+        ).all():
+            raise ValueError(
+                "Available Real_N and Synthetic_N values must be paired."
+            )
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BF vs AF similarity data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BCF_ACF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BF vs AF similarity data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BF", "AF"}:
+        raise ValueError("Similarity data must contain both BF and AF conditions.")
+
+    expected_band_features = {
+        band: {f"{band}_BP", f"{band}_RP"}
+        for band in BCF_ACF_BAND_ORDER
+    }
+    incomplete_feature_bands = [
+        band
+        for band, expected_features in expected_band_features.items()
+        if not expected_features.issubset(
+            set(dataframe.loc[dataframe["Band"] == band, "Feature"])
+        )
+    ]
+    if incomplete_feature_bands:
+        raise ValueError(
+            "Band-specific BP/RP labels are incomplete for: "
+            + ", ".join(incomplete_feature_bands)
+        )
+
+    return dataframe
+
+
+def get_bcm_acm_similarity_band_from_name(file_name):
+    """Extract the frequency band from a BCM-ACM similarity filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCF_ACF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bcm_acm_similarity_source():
+    """Find the BCM-ACM similarity ZIP or extracted CSV files."""
+    for zip_path in BCM_ACM_SIMILARITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BCM_ACM_SIMILARITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "QuantitativeSimilarity_MASTER_*_BCM_vs_ACM.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bcm_acm_similarity():
+    """Load and validate the five BCM-ACM quantitative-similarity tables."""
+    source_type, source = find_bcm_acm_similarity_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BCM vs ACM quantitative-similarity data were not found. Keep "
+            "'similarity_master BCM ACM(1).zip' beside app.py, or extract "
+            "its five QuantitativeSimilarity CSV files into similarity_master/, "
+            "data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "quantitativesimilarity" in name.lower()
+                and "_bcm_vs_acm" in Path(name).stem.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bcm_acm_similarity_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcm_acm_similarity_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BCM vs ACM QuantitativeSimilarity CSV files were found in "
+            "the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BCF_ACF_SIMILARITY_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BCM vs ACM similarity data are missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Source"] = dataframe["Feature"]
+    delta_feature_map = {
+        "Alpha_BP": "Delta_BP",
+        "Alpha_RP": "Delta_RP",
+    }
+    delta_rows = dataframe["Band"].eq("Delta") & dataframe["Feature"].isin(
+        delta_feature_map
+    )
+    dataframe.loc[delta_rows, "Feature"] = dataframe.loc[
+        delta_rows, "Feature"
+    ].map(delta_feature_map)
+    dataframe["Feature_Label_Normalized"] = delta_rows
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Mean_Difference",
+        "Real_SD",
+        "Synthetic_SD",
+        "SD_Difference",
+        "Real_Median",
+        "Synthetic_Median",
+        "Median_Difference",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Correlation",
+        "RMSE",
+        "DTW",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BCM vs ACM similarity CSV files contain missing or "
+            "non-numeric values in required metric columns."
+        )
+
+    for optional_column in ["Label", "Real_N", "Synthetic_N"]:
+        if optional_column in dataframe.columns:
+            dataframe[optional_column] = pd.to_numeric(
+                dataframe[optional_column], errors="coerce"
+            )
+
+    difference_checks = [
+        ("Mean_Difference", "Real_Mean", "Synthetic_Mean"),
+        ("SD_Difference", "Real_SD", "Synthetic_SD"),
+        ("Median_Difference", "Real_Median", "Synthetic_Median"),
+    ]
+    for difference_column, real_column, synthetic_column in difference_checks:
+        recalculated = dataframe[synthetic_column] - dataframe[real_column]
+        mismatch = (dataframe[difference_column] - recalculated).abs() > 1e-9
+        if mismatch.any():
+            raise ValueError(
+                f"{difference_column} is inconsistent with Synthetic minus "
+                "Real in the BCM vs ACM similarity data."
+            )
+
+    if ((dataframe["Correlation"] < -1) | (dataframe["Correlation"] > 1)).any():
+        raise ValueError("Correlation values must remain between -1 and 1.")
+    if (dataframe[["RMSE", "DTW"]] < 0).any().any():
+        raise ValueError("RMSE and DTW distances cannot be negative.")
+
+    if "Label" in dataframe.columns:
+        labelled_rows = dataframe["Label"].notna()
+        expected_labels = dataframe.loc[labelled_rows, "Condition"].map(
+            {"BCM": 0, "ACM": 1}
+        )
+        if expected_labels.isna().any() or not (
+            dataframe.loc[labelled_rows, "Label"] == expected_labels
+        ).all():
+            raise ValueError(
+                "Available Condition and Label values are inconsistent. "
+                "Expected BCM = 0 and ACM = 1."
+            )
+
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_rows = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        if (
+            dataframe.loc[count_rows, ["Real_N", "Synthetic_N"]] <= 0
+        ).any().any():
+            raise ValueError(
+                "Available Real_N and Synthetic_N values must be positive."
+            )
+        if not (
+            dataframe.loc[count_rows, "Real_N"]
+            == dataframe.loc[count_rows, "Synthetic_N"]
+        ).all():
+            raise ValueError(
+                "Available Real_N and Synthetic_N values must be paired."
+            )
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BCM vs ACM similarity data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BCF_ACF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BCM vs ACM similarity data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BCM", "ACM"}:
+        raise ValueError(
+            "Similarity data must contain both BCM and ACM conditions."
+        )
+
+    expected_band_features = {
+        band: {f"{band}_BP", f"{band}_RP"}
+        for band in BCF_ACF_BAND_ORDER
+    }
+    incomplete_feature_bands = [
+        band
+        for band, expected_features in expected_band_features.items()
+        if not expected_features.issubset(
+            set(dataframe.loc[dataframe["Band"] == band, "Feature"])
+        )
+    ]
+    if incomplete_feature_bands:
+        raise ValueError(
+            "Band-specific BP/RP labels are incomplete for: "
+            + ", ".join(incomplete_feature_bands)
+        )
+
+    return dataframe
+
+
+def get_bm_am_similarity_band_from_name(file_name):
+    """Extract the frequency band from a BM-AM similarity filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCF_ACF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bm_am_similarity_source():
+    """Find the BM-AM similarity ZIP or extracted CSV files."""
+    for zip_path in BM_AM_SIMILARITY_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BM_AM_SIMILARITY_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob("QuantitativeSimilarity_MASTER_*_BM_vs_AM.csv")
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bm_am_similarity():
+    """Load and validate the five BM-AM quantitative-similarity tables."""
+    source_type, source = find_bm_am_similarity_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BM vs AM quantitative-similarity data were not found. Keep "
+            "'similarity_master BM AM.zip' beside app.py, or extract its "
+            "five QuantitativeSimilarity CSV files into similarity_master/, "
+            "data/, or assets/data/."
+        )
+
+    frames = []
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_sources = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "quantitativesimilarity" in name.lower()
+                and "_bm_vs_am" in Path(name).stem.lower()
+            ]
+            for csv_name in csv_sources:
+                band = get_bm_am_similarity_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe["Band"] = band
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bm_am_similarity_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe["Band"] = band
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BM vs AM QuantitativeSimilarity CSV files were found in "
+            "the configured source."
+        )
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    missing_columns = BCF_ACF_SIMILARITY_REQUIRED_COLUMNS.difference(
+        dataframe.columns
+    )
+    if missing_columns:
+        raise ValueError(
+            "The BM vs AM similarity data are missing required columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    dataframe = dataframe.copy()
+    dataframe["Band"] = dataframe["Band"].astype(str).str.strip().str.title()
+    dataframe["Condition"] = (
+        dataframe["Condition"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Channel"] = (
+        dataframe["Channel"].astype(str).str.strip().str.upper()
+    )
+    dataframe["Feature"] = dataframe["Feature"].astype(str).str.strip()
+    dataframe["Feature_Display"] = dataframe["Feature"].str.replace(
+        "_", " ", regex=False
+    )
+
+    numeric_columns = [
+        "Real_Mean",
+        "Synthetic_Mean",
+        "Mean_Difference",
+        "Real_SD",
+        "Synthetic_SD",
+        "SD_Difference",
+        "Real_Median",
+        "Synthetic_Median",
+        "Median_Difference",
+        "Real_IQR",
+        "Synthetic_IQR",
+        "Correlation",
+        "RMSE",
+        "DTW",
+    ]
+    for column in numeric_columns:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+    if dataframe[numeric_columns].isna().any().any():
+        raise ValueError(
+            "The BM vs AM similarity CSV files contain missing or "
+            "non-numeric values in required metric columns."
+        )
+
+    for optional_column in ["Label", "Real_N", "Synthetic_N"]:
+        if optional_column in dataframe.columns:
+            dataframe[optional_column] = pd.to_numeric(
+                dataframe[optional_column], errors="coerce"
+            )
+
+    difference_checks = [
+        ("Mean_Difference", "Real_Mean", "Synthetic_Mean"),
+        ("SD_Difference", "Real_SD", "Synthetic_SD"),
+        ("Median_Difference", "Real_Median", "Synthetic_Median"),
+    ]
+    for difference_column, real_column, synthetic_column in difference_checks:
+        recalculated = dataframe[synthetic_column] - dataframe[real_column]
+        mismatch = (dataframe[difference_column] - recalculated).abs() > 1e-9
+        if mismatch.any():
+            raise ValueError(
+                f"{difference_column} is inconsistent with Synthetic minus "
+                "Real in the BM vs AM similarity data."
+            )
+
+    if ((dataframe["Correlation"] < -1) | (dataframe["Correlation"] > 1)).any():
+        raise ValueError("Correlation values must remain between -1 and 1.")
+    if (dataframe[["RMSE", "DTW"]] < 0).any().any():
+        raise ValueError("RMSE and DTW distances cannot be negative.")
+
+    if "Label" in dataframe.columns:
+        labelled_rows = dataframe["Label"].notna()
+        expected_labels = dataframe.loc[labelled_rows, "Condition"].map(
+            {"BM": 0, "AM": 1}
+        )
+        if expected_labels.isna().any() or not (
+            dataframe.loc[labelled_rows, "Label"] == expected_labels
+        ).all():
+            raise ValueError(
+                "Available Condition and Label values are inconsistent. "
+                "Expected BM = 0 and AM = 1."
+            )
+
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_rows = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        if (
+            dataframe.loc[count_rows, ["Real_N", "Synthetic_N"]] <= 0
+        ).any().any():
+            raise ValueError(
+                "Available Real_N and Synthetic_N values must be positive."
+            )
+        if not (
+            dataframe.loc[count_rows, "Real_N"]
+            == dataframe.loc[count_rows, "Synthetic_N"]
+        ).all():
+            raise ValueError(
+                "Available Real_N and Synthetic_N values must be paired."
+            )
+
+    duplicate_rows = dataframe.duplicated(
+        ["Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate Band-Condition-Channel-Feature rows were found in the "
+            "BM vs AM similarity data."
+        )
+
+    available_bands = set(dataframe["Band"].unique())
+    missing_bands = [
+        band for band in BCF_ACF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "BM vs AM similarity data are incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    if set(dataframe["Condition"].unique()) != {"BM", "AM"}:
+        raise ValueError("Similarity data must contain both BM and AM conditions.")
+
+    expected_band_features = {
+        band: {f"{band}_BP", f"{band}_RP"}
+        for band in BCF_ACF_BAND_ORDER
+    }
+    incomplete_feature_bands = [
+        band
+        for band, expected_features in expected_band_features.items()
+        if not expected_features.issubset(
+            set(dataframe.loc[dataframe["Band"] == band, "Feature"])
+        )
+    ]
+    if incomplete_feature_bands:
+        raise ValueError(
+            "Band-specific BP/RP labels are incomplete for: "
+            + ", ".join(incomplete_feature_bands)
+        )
+
+    return dataframe
+
+
+def get_bcf_acf_similarity_key_finding(dataframe):
+    """Create the global BCF-ACF quantitative-similarity finding."""
+    metric_means = dataframe[["Correlation", "RMSE", "DTW"]].mean()
+    band_means = dataframe.groupby("Band", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    condition_means = dataframe.groupby("Condition", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    highest_correlation_band = band_means["Correlation"].idxmax()
+    lowest_correlation_band = band_means["Correlation"].idxmin()
+    lowest_rmse_band = band_means["RMSE"].idxmin()
+    lowest_dtw_band = band_means["DTW"].idxmin()
+    lowest_correlation_row = dataframe.loc[dataframe["Correlation"].idxmin()]
+
+    distance_band_text = (
+        f"{lowest_rmse_band} had the lowest average RMSE "
+        f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}) and DTW "
+        f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        if lowest_rmse_band == lowest_dtw_band
+        else (
+            f"{lowest_rmse_band} had the lowest average RMSE "
+            f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}), while "
+            f"{lowest_dtw_band} had the lowest average DTW "
+            f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        )
+    )
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature comparisons, "
+        f"the average Real-Synthetic correlation was "
+        f"{metric_means['Correlation']:.3f}, with mean RMSE of "
+        f"{metric_means['RMSE']:.3f} and mean DTW of "
+        f"{metric_means['DTW']:.4f}. {highest_correlation_band} had the "
+        f"highest average correlation "
+        f"({band_means.loc[highest_correlation_band, 'Correlation']:.3f}); "
+        f"{distance_band_text}. {lowest_correlation_band} had the lowest "
+        f"average correlation "
+        f"({band_means.loc[lowest_correlation_band, 'Correlation']:.3f}). "
+        f"BCF and ACF had similar mean correlations "
+        f"({condition_means.loc['BCF', 'Correlation']:.3f} vs "
+        f"{condition_means.loc['ACF', 'Correlation']:.3f}), while ACF had "
+        f"lower mean RMSE ({condition_means.loc['ACF', 'RMSE']:.3f}) and "
+        f"DTW ({condition_means.loc['ACF', 'DTW']:.4f}). The lowest "
+        f"individual correlation was {lowest_correlation_row['Correlation']:.3f} "
+        f"for {lowest_correlation_row['Feature_Display']} at "
+        f"{lowest_correlation_row['Channel']} under "
+        f"{lowest_correlation_row['Condition']} in "
+        f"{lowest_correlation_row['Band']}."
+    )
+
+
+def get_bf_af_similarity_key_finding(dataframe):
+    """Create the global BF-AF quantitative-similarity finding."""
+    metric_means = dataframe[["Correlation", "RMSE", "DTW"]].mean()
+    band_means = dataframe.groupby("Band", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    condition_means = dataframe.groupby("Condition", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    highest_correlation_band = band_means["Correlation"].idxmax()
+    lowest_correlation_band = band_means["Correlation"].idxmin()
+    lowest_rmse_band = band_means["RMSE"].idxmin()
+    lowest_dtw_band = band_means["DTW"].idxmin()
+    highest_correlation_condition = condition_means["Correlation"].idxmax()
+    other_correlation_condition = (
+        "AF" if highest_correlation_condition == "BF" else "BF"
+    )
+    lowest_rmse_condition = condition_means["RMSE"].idxmin()
+    other_rmse_condition = "AF" if lowest_rmse_condition == "BF" else "BF"
+    lowest_dtw_condition = condition_means["DTW"].idxmin()
+    other_dtw_condition = "AF" if lowest_dtw_condition == "BF" else "BF"
+    lowest_correlation_row = dataframe.loc[dataframe["Correlation"].idxmin()]
+
+    distance_band_text = (
+        f"{lowest_rmse_band} had the lowest average RMSE "
+        f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}) and DTW "
+        f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        if lowest_rmse_band == lowest_dtw_band
+        else (
+            f"{lowest_rmse_band} had the lowest average RMSE "
+            f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}), while "
+            f"{lowest_dtw_band} had the lowest average DTW "
+            f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        )
+    )
+    if lowest_rmse_condition == lowest_dtw_condition:
+        condition_distance_text = (
+            f"{lowest_rmse_condition} had lower mean RMSE "
+            f"({condition_means.loc[lowest_rmse_condition, 'RMSE']:.3f} vs "
+            f"{condition_means.loc[other_rmse_condition, 'RMSE']:.3f}) and "
+            f"DTW ({condition_means.loc[lowest_dtw_condition, 'DTW']:.4f} "
+            f"vs {condition_means.loc[other_dtw_condition, 'DTW']:.4f})"
+        )
+    else:
+        condition_distance_text = (
+            f"{lowest_rmse_condition} had lower mean RMSE "
+            f"({condition_means.loc[lowest_rmse_condition, 'RMSE']:.3f}), "
+            f"while {lowest_dtw_condition} had lower mean DTW "
+            f"({condition_means.loc[lowest_dtw_condition, 'DTW']:.4f})"
+        )
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature comparisons, "
+        f"the average Real-Synthetic correlation was "
+        f"{metric_means['Correlation']:.3f}, with mean RMSE of "
+        f"{metric_means['RMSE']:.3f} and mean DTW of "
+        f"{metric_means['DTW']:.4f}. {highest_correlation_band} had the "
+        f"highest average correlation "
+        f"({band_means.loc[highest_correlation_band, 'Correlation']:.3f}); "
+        f"{distance_band_text}. {lowest_correlation_band} had the lowest "
+        f"average correlation "
+        f"({band_means.loc[lowest_correlation_band, 'Correlation']:.3f}). "
+        f"{highest_correlation_condition} had the higher mean correlation "
+        f"({condition_means.loc[highest_correlation_condition, 'Correlation']:.3f} "
+        f"vs {condition_means.loc[other_correlation_condition, 'Correlation']:.3f}), "
+        f"while {condition_distance_text}. The lowest individual correlation "
+        f"was {lowest_correlation_row['Correlation']:.3f} for "
+        f"{lowest_correlation_row['Feature_Display']} at "
+        f"{lowest_correlation_row['Channel']} under "
+        f"{lowest_correlation_row['Condition']} in "
+        f"{lowest_correlation_row['Band']}."
+    )
+
+
+def get_bcm_acm_similarity_key_finding(dataframe):
+    """Create the global BCM-ACM quantitative-similarity finding."""
+    metric_means = dataframe[["Correlation", "RMSE", "DTW"]].mean()
+    band_means = dataframe.groupby("Band", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    condition_means = dataframe.groupby("Condition", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    highest_correlation_band = band_means["Correlation"].idxmax()
+    lowest_correlation_band = band_means["Correlation"].idxmin()
+    lowest_rmse_band = band_means["RMSE"].idxmin()
+    lowest_dtw_band = band_means["DTW"].idxmin()
+    highest_correlation_condition = condition_means["Correlation"].idxmax()
+    other_correlation_condition = (
+        "ACM" if highest_correlation_condition == "BCM" else "BCM"
+    )
+    lowest_rmse_condition = condition_means["RMSE"].idxmin()
+    other_rmse_condition = (
+        "ACM" if lowest_rmse_condition == "BCM" else "BCM"
+    )
+    lowest_dtw_condition = condition_means["DTW"].idxmin()
+    other_dtw_condition = (
+        "ACM" if lowest_dtw_condition == "BCM" else "BCM"
+    )
+    lowest_correlation_row = dataframe.loc[dataframe["Correlation"].idxmin()]
+
+    distance_band_text = (
+        f"{lowest_rmse_band} had the lowest average RMSE "
+        f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}) and DTW "
+        f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        if lowest_rmse_band == lowest_dtw_band
+        else (
+            f"{lowest_rmse_band} had the lowest average RMSE "
+            f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}), while "
+            f"{lowest_dtw_band} had the lowest average DTW "
+            f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        )
+    )
+    if lowest_rmse_condition == lowest_dtw_condition:
+        condition_distance_text = (
+            f"{lowest_rmse_condition} had lower mean RMSE "
+            f"({condition_means.loc[lowest_rmse_condition, 'RMSE']:.3f} vs "
+            f"{condition_means.loc[other_rmse_condition, 'RMSE']:.3f}) and "
+            f"DTW ({condition_means.loc[lowest_dtw_condition, 'DTW']:.4f} "
+            f"vs {condition_means.loc[other_dtw_condition, 'DTW']:.4f})"
+        )
+    else:
+        condition_distance_text = (
+            f"{lowest_rmse_condition} had lower mean RMSE "
+            f"({condition_means.loc[lowest_rmse_condition, 'RMSE']:.3f}), "
+            f"while {lowest_dtw_condition} had lower mean DTW "
+            f"({condition_means.loc[lowest_dtw_condition, 'DTW']:.4f})"
+        )
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature comparisons, "
+        f"the average Real-Synthetic correlation was "
+        f"{metric_means['Correlation']:.3f}, with mean RMSE of "
+        f"{metric_means['RMSE']:.3f} and mean DTW of "
+        f"{metric_means['DTW']:.4f}. {highest_correlation_band} had the "
+        f"highest average correlation "
+        f"({band_means.loc[highest_correlation_band, 'Correlation']:.3f}); "
+        f"{distance_band_text}. {lowest_correlation_band} had the lowest "
+        f"average correlation "
+        f"({band_means.loc[lowest_correlation_band, 'Correlation']:.3f}). "
+        f"{highest_correlation_condition} had the higher mean correlation "
+        f"({condition_means.loc[highest_correlation_condition, 'Correlation']:.3f} "
+        f"vs {condition_means.loc[other_correlation_condition, 'Correlation']:.3f}), "
+        f"while {condition_distance_text}. The lowest individual correlation "
+        f"was {lowest_correlation_row['Correlation']:.3f} for "
+        f"{lowest_correlation_row['Feature_Display']} at "
+        f"{lowest_correlation_row['Channel']} under "
+        f"{lowest_correlation_row['Condition']} in "
+        f"{lowest_correlation_row['Band']}."
+    )
+
+
+def get_bm_am_similarity_key_finding(dataframe):
+    """Create the global BM-AM quantitative-similarity finding."""
+    metric_means = dataframe[["Correlation", "RMSE", "DTW"]].mean()
+    band_means = dataframe.groupby("Band", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    condition_means = dataframe.groupby("Condition", observed=True)[
+        ["Correlation", "RMSE", "DTW"]
+    ].mean()
+    highest_correlation_band = band_means["Correlation"].idxmax()
+    lowest_correlation_band = band_means["Correlation"].idxmin()
+    lowest_rmse_band = band_means["RMSE"].idxmin()
+    lowest_dtw_band = band_means["DTW"].idxmin()
+    highest_correlation_condition = condition_means["Correlation"].idxmax()
+    other_correlation_condition = (
+        "AM" if highest_correlation_condition == "BM" else "BM"
+    )
+    lowest_rmse_condition = condition_means["RMSE"].idxmin()
+    other_rmse_condition = "AM" if lowest_rmse_condition == "BM" else "BM"
+    lowest_dtw_condition = condition_means["DTW"].idxmin()
+    other_dtw_condition = "AM" if lowest_dtw_condition == "BM" else "BM"
+    lowest_correlation_row = dataframe.loc[dataframe["Correlation"].idxmin()]
+
+    distance_band_text = (
+        f"{lowest_rmse_band} had the lowest average RMSE "
+        f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}) and DTW "
+        f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        if lowest_rmse_band == lowest_dtw_band
+        else (
+            f"{lowest_rmse_band} had the lowest average RMSE "
+            f"({band_means.loc[lowest_rmse_band, 'RMSE']:.3f}), while "
+            f"{lowest_dtw_band} had the lowest average DTW "
+            f"({band_means.loc[lowest_dtw_band, 'DTW']:.4f})"
+        )
+    )
+    if lowest_rmse_condition == lowest_dtw_condition:
+        condition_distance_text = (
+            f"{lowest_rmse_condition} had lower mean RMSE "
+            f"({condition_means.loc[lowest_rmse_condition, 'RMSE']:.3f} vs "
+            f"{condition_means.loc[other_rmse_condition, 'RMSE']:.3f}) and "
+            f"DTW ({condition_means.loc[lowest_dtw_condition, 'DTW']:.4f} "
+            f"vs {condition_means.loc[other_dtw_condition, 'DTW']:.4f})"
+        )
+    else:
+        condition_distance_text = (
+            f"{lowest_rmse_condition} had lower mean RMSE "
+            f"({condition_means.loc[lowest_rmse_condition, 'RMSE']:.3f}), "
+            f"while {lowest_dtw_condition} had lower mean DTW "
+            f"({condition_means.loc[lowest_dtw_condition, 'DTW']:.4f})"
+        )
+
+    return (
+        f"Across {len(dataframe)} band-condition-channel-feature comparisons, "
+        f"the average Real-Synthetic correlation was "
+        f"{metric_means['Correlation']:.3f}, with mean RMSE of "
+        f"{metric_means['RMSE']:.3f} and mean DTW of "
+        f"{metric_means['DTW']:.4f}. {highest_correlation_band} had the "
+        f"highest average correlation "
+        f"({band_means.loc[highest_correlation_band, 'Correlation']:.3f}); "
+        f"{distance_band_text}. {lowest_correlation_band} had the lowest "
+        f"average correlation "
+        f"({band_means.loc[lowest_correlation_band, 'Correlation']:.3f}). "
+        f"{highest_correlation_condition} had the higher mean correlation "
+        f"({condition_means.loc[highest_correlation_condition, 'Correlation']:.3f} "
+        f"vs {condition_means.loc[other_correlation_condition, 'Correlation']:.3f}), "
+        f"while {condition_distance_text}. The lowest individual correlation "
+        f"was {lowest_correlation_row['Correlation']:.3f} for "
+        f"{lowest_correlation_row['Feature_Display']} at "
+        f"{lowest_correlation_row['Channel']} under "
+        f"{lowest_correlation_row['Condition']} in "
+        f"{lowest_correlation_row['Band']}."
+    )
+
+
+def get_bcf_acf_similarity_interpretation(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+    combined_condition_text="BCF and ACF",
+):
+    """Explain the selected BCF-ACF quantitative-similarity view."""
+    metric_config = BCF_ACF_SIMILARITY_METRICS[selected_metric]
+    metric_column = metric_config["column"]
+    metric_average = selected_data[metric_column].mean()
+    metric_median = selected_data[metric_column].median()
+    condition_text = (
+        combined_condition_text
+        if selected_condition == "All Conditions"
+        else selected_condition
+    )
+
+    if metric_config["direction"] == "higher":
+        best_row = selected_data.loc[selected_data[metric_column].idxmax()]
+        review_row = selected_data.loc[selected_data[metric_column].idxmin()]
+        direction_text = (
+            "Higher correlation indicates stronger pattern association, but "
+            "does not guarantee identical values or distributions."
+        )
+    else:
+        best_row = selected_data.loc[selected_data[metric_column].idxmin()]
+        review_row = selected_data.loc[selected_data[metric_column].idxmax()]
+        direction_text = (
+            f"Lower {selected_metric} indicates closer agreement for this "
+            "metric."
+        )
+
+    number_format = metric_config["format"]
+    return (
+        f"For {selected_band} across {condition_text}, average "
+        f"{selected_metric} was {metric_average:{number_format}} and the "
+        f"median was {metric_median:{number_format}}. The closest result by "
+        f"this metric was {best_row['Feature_Display']} at "
+        f"{best_row['Channel']} under {best_row['Condition']} "
+        f"({best_row[metric_column]:{number_format}}). The combination "
+        f"requiring the closest review was {review_row['Feature_Display']} "
+        f"at {review_row['Channel']} under {review_row['Condition']} "
+        f"({review_row[metric_column]:{number_format}}). {direction_text}"
+    )
+
+
+def build_bcf_acf_similarity_profile_figure(
+    selected_data,
+    selected_band,
+    condition,
+):
+    """Build a two-panel Real-versus-Synthetic 24-D summary profile."""
+    profile_data = selected_data[
+        selected_data["Condition"] == condition
+    ].copy()
+    feature_order = get_bcf_acf_synthetic_feature_order(
+        profile_data, selected_band
+    )
+    channel_order = {
+        channel: index
+        for index, channel in enumerate(BCF_ACF_CHANNEL_ORDER)
+    }
+    feature_rank = {
+        feature: index for index, feature in enumerate(feature_order)
+    }
+    profile_data["Channel_Order"] = profile_data["Channel"].map(
+        channel_order
+    )
+    profile_data["Feature_Order"] = profile_data["Feature"].map(
+        feature_rank
+    )
+    profile_data = profile_data.sort_values(
+        ["Channel_Order", "Feature_Order"]
+    ).reset_index(drop=True)
+
+    expected_dimensions = len(BCF_ACF_CHANNEL_ORDER) * len(feature_order)
+    if len(profile_data) != expected_dimensions:
+        raise ValueError(
+            f"The {condition} {selected_band} profile contains "
+            f"{len(profile_data)} dimensions; expected "
+            f"{expected_dimensions}."
+        )
+
+    positions = list(range(len(profile_data)))
+    dimension_labels = [
+        f"{row.Channel} · {row.Feature_Display}"
+        for row in profile_data.itertuples()
+    ]
+    figure = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.13,
+        subplot_titles=(
+            f"Real {condition} — 24-D summary profile",
+            f"Synthetic {condition} — 24-D summary profile",
+        ),
+    )
+    profile_styles = {
+        "Real": {
+            "mean": "#111111",
+            "median": "#2F80ED",
+            "fill": "rgba(255,171,145,0.30)",
+        },
+        "Synthetic": {
+            "mean": "#18B7A0",
+            "median": "#FF9F43",
+            "fill": "rgba(24,183,160,0.16)",
+        },
+    }
+
+    for row_index, source_name in enumerate(
+        ["Real", "Synthetic"], start=1
+    ):
+        mean_column = f"{source_name}_Mean"
+        median_column = f"{source_name}_Median"
+        sd_column = f"{source_name}_SD"
+        iqr_column = f"{source_name}_IQR"
+        means = profile_data[mean_column]
+        medians = profile_data[median_column]
+        standard_deviations = profile_data[sd_column]
+        lower_band = means - standard_deviations
+        upper_band = means + standard_deviations
+        style = profile_styles[source_name]
+        custom_data = profile_data[
+            [
+                "Channel",
+                "Feature_Display",
+                mean_column,
+                median_column,
+                sd_column,
+                iqr_column,
+                "Correlation",
+                "RMSE",
+                "DTW",
+            ]
+        ].values
+
+        figure.add_trace(
+            go.Scatter(
+                x=positions,
+                y=lower_band,
+                mode="lines",
+                line={"width": 0},
+                hoverinfo="skip",
+                showlegend=False,
+                legendgroup=f"{source_name}-spread",
+            ),
+            row=row_index,
+            col=1,
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=positions,
+                y=upper_band,
+                mode="lines",
+                line={"width": 0},
+                fill="tonexty",
+                fillcolor=style["fill"],
+                name=f"{source_name} ±1 SD",
+                legendgroup=f"{source_name}-spread",
+                hoverinfo="skip",
+            ),
+            row=row_index,
+            col=1,
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=positions,
+                y=means,
+                mode="lines+markers",
+                name=f"{source_name} mean",
+                legendgroup=f"{source_name}-mean",
+                line={"color": style["mean"], "width": 2.7},
+                marker={
+                    "color": style["mean"],
+                    "size": 7,
+                    "line": {"color": "#F7FAF9", "width": 1},
+                },
+                customdata=custom_data,
+                hovertemplate=(
+                    "Channel: %{customdata[0]}<br>"
+                    "Feature: %{customdata[1]}<br>"
+                    "Mean: %{customdata[2]:.4f}<br>"
+                    "Median: %{customdata[3]:.4f}<br>"
+                    "SD: %{customdata[4]:.4f}<br>"
+                    "IQR: %{customdata[5]:.4f}<br>"
+                    "Correlation: %{customdata[6]:.4f}<br>"
+                    "RMSE: %{customdata[7]:.4f}<br>"
+                    "DTW: %{customdata[8]:.5f}<extra></extra>"
+                ),
+            ),
+            row=row_index,
+            col=1,
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=positions,
+                y=medians,
+                mode="lines+markers",
+                name=f"{source_name} median",
+                legendgroup=f"{source_name}-median",
+                line={
+                    "color": style["median"],
+                    "width": 2.0,
+                    "dash": "dot",
+                },
+                marker={
+                    "color": style["median"],
+                    "size": 5,
+                    "symbol": "diamond",
+                },
+                customdata=custom_data,
+                hovertemplate=(
+                    "Channel: %{customdata[0]}<br>"
+                    "Feature: %{customdata[1]}<br>"
+                    "Median: %{customdata[3]:.4f}<br>"
+                    "Mean: %{customdata[2]:.4f}<br>"
+                    "IQR: %{customdata[5]:.4f}<extra></extra>"
+                ),
+            ),
+            row=row_index,
+            col=1,
+        )
+
+    features_per_channel = len(feature_order)
+    for channel_index in range(1, len(BCF_ACF_CHANNEL_ORDER)):
+        boundary = channel_index * features_per_channel - 0.5
+        for row_index in [1, 2]:
+            figure.add_vline(
+                x=boundary,
+                line={
+                    "color": "rgba(74,105,96,0.30)",
+                    "width": 1,
+                    "dash": "dot",
+                },
+                row=row_index,
+                col=1,
+            )
+
+    figure.update_layout(
+        title=(
+            f"Real vs Synthetic {selected_band} Feature-Vector Profiles"
+            f"<br><sup>{condition} · {expected_dimensions}-D "
+            "channel-feature summary</sup>"
+        ),
+        hovermode="x unified",
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.03,
+            "xanchor": "right",
+            "x": 1,
+        },
+    )
+    figure.update_xaxes(showticklabels=False, row=1, col=1)
+    figure.update_xaxes(
+        title_text="Feature dimension",
+        tickmode="array",
+        tickvals=positions,
+        ticktext=dimension_labels,
+        tickangle=-58,
+        row=2,
+        col=1,
+    )
+    figure.update_yaxes(title_text="Feature value", row=1, col=1)
+    figure.update_yaxes(title_text="Feature value", row=2, col=1)
+    figure = style_bcf_acf_pre_post_figure(figure, 830)
+    figure.update_layout(margin=dict(l=65, r=30, t=105, b=185))
+    return figure
+
+
+def build_bcf_acf_similarity_heatmap(
+    selected_data,
+    selected_band,
+    selected_condition,
+    selected_metric,
+):
+    """Build a channel-by-feature heatmap for one similarity metric."""
+    metric_config = BCF_ACF_SIMILARITY_METRICS[selected_metric]
+    metric_column = metric_config["column"]
+    heatmap_data = (
+        selected_data.groupby(
+            ["Channel", "Feature", "Feature_Display"], observed=True
+        )[metric_column]
+        .mean()
+        .reset_index()
+    )
+    feature_order = get_bcf_acf_synthetic_feature_order(
+        selected_data, selected_band
+    )
+    display_lookup = (
+        heatmap_data.drop_duplicates("Feature")
+        .set_index("Feature")["Feature_Display"]
+        .to_dict()
+    )
+    pivot = heatmap_data.pivot(
+        index="Channel", columns="Feature", values=metric_column
+    ).reindex(index=BCF_ACF_CHANNEL_ORDER, columns=feature_order)
+    feature_labels = [
+        display_lookup.get(feature, feature) for feature in feature_order
+    ]
+    if selected_metric == "Correlation":
+        colorscale = [
+            [0.0, "#6C3FD1"],
+            [0.5, "#F2F7F5"],
+            [1.0, "#237A57"],
+        ]
+        zmin, zmax = -1, 1
+        text_values = pivot.round(3).astype(str).values
+    else:
+        colorscale = [
+            [0.0, "#EEF7F2"],
+            [0.45, "#8FD3BE"],
+            [1.0, "#6C3FD1"],
+        ]
+        zmin, zmax = None, None
+        decimals = 4 if selected_metric == "DTW" else 3
+        text_values = pivot.round(decimals).astype(str).values
+
+    figure = go.Figure(
+        data=go.Heatmap(
+            z=pivot.values,
+            x=feature_labels,
+            y=pivot.index,
+            colorscale=colorscale,
+            zmin=zmin,
+            zmax=zmax,
+            text=text_values,
+            texttemplate="%{text}",
+            colorbar={"title": selected_metric},
+            hovertemplate=(
+                "Channel: %{y}<br>Feature: %{x}<br>"
+                f"{selected_metric}: %{{z:.5f}}<extra></extra>"
+            ),
+        )
+    )
+    figure.update_layout(
+        title=(
+            f"{selected_metric} by Channel and Feature<br>"
+            f"<sup>{selected_band} · {selected_condition}</sup>"
+        ),
+        xaxis_title="Feature",
+        yaxis_title="EEG Channel",
+    )
+    figure.update_xaxes(tickangle=-18)
+    return style_bcf_acf_pre_post_figure(figure, 430)
+
+
+def build_bcf_acf_similarity_band_overview(
+    dataframe,
+    condition_order=("BCF", "ACF"),
+    condition_colors=None,
+):
+    """Compare the three configured similarity metrics across all bands."""
+    summary = (
+        dataframe.groupby(["Band", "Condition"], observed=True)[
+            ["Correlation", "RMSE", "DTW"]
+        ]
+        .mean()
+        .reset_index()
+    )
+    figure = make_subplots(
+        rows=1,
+        cols=3,
+        subplot_titles=("Correlation ↑", "RMSE ↓", "DTW ↓"),
+        horizontal_spacing=0.08,
+    )
+    if condition_colors is None:
+        condition_colors = {"BCF": "#27465A", "ACF": "#69B88B"}
+    for column_index, metric in enumerate(
+        ["Correlation", "RMSE", "DTW"], start=1
+    ):
+        for condition in condition_order:
+            trace_data = (
+                summary[summary["Condition"] == condition]
+                .set_index("Band")
+                .reindex(BCF_ACF_BAND_ORDER)
+            )
+            figure.add_trace(
+                go.Bar(
+                    x=trace_data.index,
+                    y=trace_data[metric],
+                    name=condition,
+                    legendgroup=condition,
+                    showlegend=column_index == 1,
+                    marker_color=condition_colors[condition],
+                    hovertemplate=(
+                        "Band: %{x}<br>Average: %{y:.5f}"
+                        f"<extra>{condition} · {metric}</extra>"
+                    ),
+                ),
+                row=1,
+                col=column_index,
+            )
+    figure.update_layout(
+        title=(
+            "Average Quantitative Similarity by Frequency Band<br>"
+            "<sup>Correlation: higher is stronger · RMSE/DTW: lower is closer</sup>"
+        ),
+        barmode="group",
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
+    )
+    figure.update_yaxes(range=[0, 1.02], row=1, col=1)
+    figure.update_yaxes(rangemode="tozero", row=1, col=2)
+    figure.update_yaxes(rangemode="tozero", row=1, col=3)
+    return style_bcf_acf_pre_post_figure(figure, 470)
+
+
+def render_bcf_acf_quantitative_similarity():
+    """Render BCF-ACF Real-versus-Synthetic similarity metrics."""
+    st.subheader("Quantitative similarity analysis")
+    st.caption(
+        "Compare Real and ACGAN-generated feature distributions using the "
+        "three metrics available in the source files: Correlation, RMSE, and "
+        "DTW."
+    )
+
+    try:
+        dataframe = load_bcf_acf_similarity()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'similarity_master BCF ACF.zip' beside app.py, or extract "
+            "its five CSV files into similarity_master/, data/, or "
+            "assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bcf_acf_similarity_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bcf_acf_similarity_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BCF", "ACF"],
+            index=0,
+            key="bcf_acf_similarity_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Metric",
+            list(BCF_ACF_SIMILARITY_METRICS),
+            index=0,
+            key="bcf_acf_similarity_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No similarity rows match the selected filters.")
+        return
+
+    cards = st.columns(5)
+    cards[0].metric("Comparisons", len(selected_data))
+    cards[1].metric(
+        "Avg Correlation ↑", f"{selected_data['Correlation'].mean():.3f}"
+    )
+    cards[2].metric("Avg RMSE ↓", f"{selected_data['RMSE'].mean():.3f}")
+    cards[3].metric("Avg DTW ↓", f"{selected_data['DTW'].mean():.4f}")
+    selected_format = BCF_ACF_SIMILARITY_METRICS[selected_metric]["format"]
+    cards[4].metric(
+        f"Median {selected_metric}",
+        f"{selected_data[selected_metric].median():{selected_format}}",
+    )
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bcf_acf_similarity_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+        )
+    )
+
+    st.markdown("#### Real–Synthetic feature-vector profiles")
+    profile_conditions = (
+        ["BCF", "ACF"]
+        if selected_condition == "All Conditions"
+        else [selected_condition]
+    )
+    if len(profile_conditions) == 2:
+        profile_tabs = st.tabs(["BCF profile", "ACF profile"])
+        profile_containers = zip(profile_tabs, profile_conditions)
+    else:
+        profile_containers = [(st.container(), profile_conditions[0])]
+
+    for profile_container, profile_condition in profile_containers:
+        with profile_container:
+            profile_figure = build_bcf_acf_similarity_profile_figure(
+                selected_data,
+                selected_band,
+                profile_condition,
+            )
+            st.plotly_chart(
+                profile_figure,
+                use_container_width=True,
+                key=(
+                    "bcf_acf_similarity_profile_"
+                    f"{profile_condition.lower()}"
+                ),
+            )
+    st.caption(
+        "Each profile contains 24 dimensions (four EEG channels × six "
+        "features). Solid lines show means, dotted lines show medians, and "
+        "shaded ribbons show mean ±1 SD on the scale stored in the source "
+        "CSV. The source contains summary statistics rather than the five "
+        "individual vectors shown in the reference images, so no individual "
+        "sample lines are invented."
+    )
+
+    heatmap_figure = build_bcf_acf_similarity_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bcf_acf_similarity_heatmap",
+    )
+    if selected_metric == "Correlation":
+        st.caption(
+            "Greener cells indicate stronger positive correlation. When both "
+            "conditions are selected, each cell is their average."
+        )
+    else:
+        st.caption(
+            "Deeper purple cells indicate larger distance and therefore a "
+            "combination requiring closer review. When both conditions are "
+            "selected, each cell is their average."
+        )
+
+    band_figure = build_bcf_acf_similarity_band_overview(dataframe)
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bcf_acf_similarity_band_overview",
+    )
+    st.caption(
+        "The three panels retain their original metric scales and separate "
+        "BCF from ACF; no cross-metric composite score is applied."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    metric_column = BCF_ACF_SIMILARITY_METRICS[selected_metric]["column"]
+    if BCF_ACF_SIMILARITY_METRICS[selected_metric]["direction"] == "higher":
+        review_table = selected_data.nsmallest(10, metric_column)
+    else:
+        review_table = selected_data.nlargest(10, metric_column)
+    review_table = review_table[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Correlation",
+            "RMSE",
+            "DTW",
+        ]
+    ].copy()
+    review_table = review_table.rename(columns={"Feature_Display": "Feature"})
+    review_table["Correlation"] = review_table["Correlation"].round(4)
+    review_table["RMSE"] = review_table["RMSE"].round(4)
+    review_table["DTW"] = review_table["DTW"].round(5)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    count_rows = 0
+    known_counts = []
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_mask = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        count_rows = int(count_mask.sum())
+        known_counts = sorted(
+            dataframe.loc[count_mask, "Real_N"].astype(int).unique()
+        )
+    if count_rows and len(known_counts) == 1:
+        sample_note = (
+            f"Sample sizes are supplied for {count_rows} of "
+            f"{len(dataframe)} rows (Gamma: {known_counts[0]:,} Real and "
+            f"{known_counts[0]:,} Synthetic); the remaining rows omit N and "
+            "are not imputed. "
+        )
+    else:
+        sample_note = (
+            "Sample-size fields are incomplete and are not imputed or used "
+            "as analysis weights. "
+        )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Correlation measures association rather than equality. RMSE and "
+        "DTW are distance measures, so lower values indicate closer agreement, "
+        "but their magnitudes are not directly interchangeable. The source "
+        "profile charts use supplied mean, median, and SD summaries; exact "
+        "five-sample profile reconstruction would require the underlying "
+        "24-D Real and Synthetic vectors. The source "
+        "files do not contain Wasserstein distance, KS statistics, MMD, or a "
+        "predefined composite similarity score; none are inferred here. "
+        "These metrics are descriptive and do not establish statistical "
+        "equivalence."
+    )
+
+
+def render_bf_af_quantitative_similarity():
+    """Render BF-AF Real-versus-Synthetic similarity metrics."""
+    st.subheader("Quantitative similarity analysis")
+    st.caption(
+        "Compare Real and ACGAN-generated feature distributions using the "
+        "three metrics available in the source files: Correlation, RMSE, and "
+        "DTW."
+    )
+
+    try:
+        dataframe = load_bf_af_similarity()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'similarity_master BF AF.zip' beside app.py, or extract "
+            "its five CSV files into similarity_master/, data/, or "
+            "assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bf_af_similarity_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bf_af_similarity_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BF", "AF"],
+            index=0,
+            key="bf_af_similarity_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Metric",
+            list(BCF_ACF_SIMILARITY_METRICS),
+            index=0,
+            key="bf_af_similarity_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No similarity rows match the selected filters.")
+        return
+
+    cards = st.columns(5)
+    cards[0].metric("Comparisons", len(selected_data))
+    cards[1].metric(
+        "Avg Correlation ↑", f"{selected_data['Correlation'].mean():.3f}"
+    )
+    cards[2].metric("Avg RMSE ↓", f"{selected_data['RMSE'].mean():.3f}")
+    cards[3].metric("Avg DTW ↓", f"{selected_data['DTW'].mean():.4f}")
+    selected_format = BCF_ACF_SIMILARITY_METRICS[selected_metric]["format"]
+    cards[4].metric(
+        f"Median {selected_metric}",
+        f"{selected_data[selected_metric].median():{selected_format}}",
+    )
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bcf_acf_similarity_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+            combined_condition_text="BF and AF",
+        )
+    )
+
+    st.markdown("#### Real–Synthetic feature-vector profiles")
+    profile_conditions = (
+        ["BF", "AF"]
+        if selected_condition == "All Conditions"
+        else [selected_condition]
+    )
+    if len(profile_conditions) == 2:
+        profile_tabs = st.tabs(["BF profile", "AF profile"])
+        profile_containers = zip(profile_tabs, profile_conditions)
+    else:
+        profile_containers = [(st.container(), profile_conditions[0])]
+
+    for profile_container, profile_condition in profile_containers:
+        with profile_container:
+            profile_figure = build_bcf_acf_similarity_profile_figure(
+                selected_data,
+                selected_band,
+                profile_condition,
+            )
+            st.plotly_chart(
+                profile_figure,
+                use_container_width=True,
+                key=(
+                    "bf_af_similarity_profile_"
+                    f"{profile_condition.lower()}"
+                ),
+            )
+    st.caption(
+        "Each profile contains 24 dimensions (four EEG channels × six "
+        "features). Solid lines show means, dotted lines show medians, and "
+        "shaded ribbons show mean ±1 SD on the scale stored in the source "
+        "CSV. The source contains summary statistics rather than individual "
+        "24-D vectors, so no individual sample lines are invented."
+    )
+
+    heatmap_figure = build_bcf_acf_similarity_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bf_af_similarity_heatmap",
+    )
+    if selected_metric == "Correlation":
+        st.caption(
+            "Greener cells indicate stronger positive correlation. When both "
+            "conditions are selected, each cell is their average."
+        )
+    else:
+        st.caption(
+            "Deeper purple cells indicate larger distance and therefore a "
+            "combination requiring closer review. When both conditions are "
+            "selected, each cell is their average."
+        )
+
+    band_figure = build_bcf_acf_similarity_band_overview(
+        dataframe,
+        condition_order=("BF", "AF"),
+        condition_colors={"BF": "#27465A", "AF": "#69B88B"},
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bf_af_similarity_band_overview",
+    )
+    st.caption(
+        "The three panels retain their original metric scales and separate "
+        "BF from AF; no cross-metric composite score is applied."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    metric_column = BCF_ACF_SIMILARITY_METRICS[selected_metric]["column"]
+    if BCF_ACF_SIMILARITY_METRICS[selected_metric]["direction"] == "higher":
+        review_table = selected_data.nsmallest(10, metric_column)
+    else:
+        review_table = selected_data.nlargest(10, metric_column)
+    review_table = review_table[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Correlation",
+            "RMSE",
+            "DTW",
+        ]
+    ].copy()
+    review_table = review_table.rename(columns={"Feature_Display": "Feature"})
+    review_table["Correlation"] = review_table["Correlation"].round(4)
+    review_table["RMSE"] = review_table["RMSE"].round(4)
+    review_table["DTW"] = review_table["DTW"].round(5)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    count_rows = 0
+    known_counts = []
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_mask = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        count_rows = int(count_mask.sum())
+        known_counts = sorted(
+            dataframe.loc[count_mask, "Real_N"].astype(int).unique()
+        )
+    if count_rows and len(known_counts) == 1:
+        sample_note = (
+            f"Sample sizes are supplied for {count_rows} of "
+            f"{len(dataframe)} rows ({known_counts[0]:,} Real and "
+            f"{known_counts[0]:,} Synthetic); the remaining rows omit N and "
+            "are not imputed. "
+        )
+    else:
+        sample_note = (
+            "The source files do not provide complete Real_N and Synthetic_N "
+            "fields; sample counts are not imputed or used as analysis "
+            "weights. "
+        )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Correlation measures association rather than equality. RMSE and "
+        "DTW are distance measures, so lower values indicate closer agreement, "
+        "but their magnitudes are not directly interchangeable. The source "
+        "profile charts use supplied mean, median, and SD summaries; exact "
+        "individual-vector reconstruction would require the underlying 24-D "
+        "Real and Synthetic observations. The source files do not contain "
+        "Wasserstein distance, KS statistics, MMD, or a predefined composite "
+        "similarity score; none are inferred here. These metrics are "
+        "descriptive and do not establish statistical equivalence."
+    )
+
+
+def render_bcm_acm_quantitative_similarity():
+    """Render BCM-ACM Real-versus-Synthetic similarity metrics."""
+    st.subheader("Quantitative similarity analysis")
+    st.caption(
+        "Compare Real and ACGAN-generated feature distributions using the "
+        "three metrics available in the source files: Correlation, RMSE, and "
+        "DTW."
+    )
+
+    try:
+        dataframe = load_bcm_acm_similarity()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'similarity_master BCM ACM(1).zip' beside app.py, or "
+            "extract its five CSV files into similarity_master/, data/, or "
+            "assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bcm_acm_similarity_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bcm_acm_similarity_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BCM", "ACM"],
+            index=0,
+            key="bcm_acm_similarity_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Metric",
+            list(BCF_ACF_SIMILARITY_METRICS),
+            index=0,
+            key="bcm_acm_similarity_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No similarity rows match the selected filters.")
+        return
+
+    cards = st.columns(5)
+    cards[0].metric("Comparisons", len(selected_data))
+    cards[1].metric(
+        "Avg Correlation ↑", f"{selected_data['Correlation'].mean():.3f}"
+    )
+    cards[2].metric("Avg RMSE ↓", f"{selected_data['RMSE'].mean():.3f}")
+    cards[3].metric("Avg DTW ↓", f"{selected_data['DTW'].mean():.4f}")
+    selected_format = BCF_ACF_SIMILARITY_METRICS[selected_metric]["format"]
+    cards[4].metric(
+        f"Median {selected_metric}",
+        f"{selected_data[selected_metric].median():{selected_format}}",
+    )
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bcf_acf_similarity_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+            combined_condition_text="BCM and ACM",
+        )
+    )
+
+    st.markdown("#### Real–Synthetic feature-vector profiles")
+    profile_conditions = (
+        ["BCM", "ACM"]
+        if selected_condition == "All Conditions"
+        else [selected_condition]
+    )
+    if len(profile_conditions) == 2:
+        profile_tabs = st.tabs(["BCM profile", "ACM profile"])
+        profile_containers = zip(profile_tabs, profile_conditions)
+    else:
+        profile_containers = [(st.container(), profile_conditions[0])]
+
+    for profile_container, profile_condition in profile_containers:
+        with profile_container:
+            profile_figure = build_bcf_acf_similarity_profile_figure(
+                selected_data,
+                selected_band,
+                profile_condition,
+            )
+            st.plotly_chart(
+                profile_figure,
+                use_container_width=True,
+                key=(
+                    "bcm_acm_similarity_profile_"
+                    f"{profile_condition.lower()}"
+                ),
+            )
+    st.caption(
+        "Each profile contains 24 dimensions (four EEG channels × six "
+        "features). Solid lines show means, dotted lines show medians, and "
+        "shaded ribbons show mean ±1 SD on the scale stored in the source "
+        "CSV. The source contains summary statistics rather than individual "
+        "24-D vectors, so no individual sample lines are invented."
+    )
+
+    heatmap_figure = build_bcf_acf_similarity_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bcm_acm_similarity_heatmap",
+    )
+    if selected_metric == "Correlation":
+        st.caption(
+            "Greener cells indicate stronger positive correlation. When both "
+            "conditions are selected, each cell is their average."
+        )
+    else:
+        st.caption(
+            "Deeper purple cells indicate larger distance and therefore a "
+            "combination requiring closer review. When both conditions are "
+            "selected, each cell is their average."
+        )
+
+    band_figure = build_bcf_acf_similarity_band_overview(
+        dataframe,
+        condition_order=("BCM", "ACM"),
+        condition_colors={"BCM": "#27465A", "ACM": "#69B88B"},
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bcm_acm_similarity_band_overview",
+    )
+    st.caption(
+        "The three panels retain their original metric scales and separate "
+        "BCM from ACM; no cross-metric composite score is applied."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    metric_column = BCF_ACF_SIMILARITY_METRICS[selected_metric]["column"]
+    if BCF_ACF_SIMILARITY_METRICS[selected_metric]["direction"] == "higher":
+        review_table = selected_data.nsmallest(10, metric_column)
+    else:
+        review_table = selected_data.nlargest(10, metric_column)
+    review_table = review_table[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Correlation",
+            "RMSE",
+            "DTW",
+        ]
+    ].copy()
+    review_table = review_table.rename(columns={"Feature_Display": "Feature"})
+    review_table["Correlation"] = review_table["Correlation"].round(4)
+    review_table["RMSE"] = review_table["RMSE"].round(4)
+    review_table["DTW"] = review_table["DTW"].round(5)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    count_rows = 0
+    known_counts = []
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_mask = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        count_rows = int(count_mask.sum())
+        known_counts = sorted(
+            dataframe.loc[count_mask, "Real_N"].astype(int).unique()
+        )
+    if count_rows and len(known_counts) == 1:
+        sample_note = (
+            f"Sample sizes are supplied for {count_rows} of "
+            f"{len(dataframe)} rows ({known_counts[0]:,} Real and "
+            f"{known_counts[0]:,} Synthetic); the remaining rows omit N and "
+            "are not imputed. "
+        )
+    else:
+        sample_note = (
+            "The source files do not provide complete Real_N and Synthetic_N "
+            "fields; sample counts are not imputed or used as analysis "
+            "weights. "
+        )
+    normalized_label_count = int(dataframe["Feature_Label_Normalized"].sum())
+    label_note = (
+        f"The Delta source labels {normalized_label_count} BP/RP rows as "
+        "Alpha_BP or Alpha_RP; the dashboard standardizes only those labels "
+        "to Delta_BP and Delta_RP while preserving every numeric value. "
+    )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + label_note
+        + "Correlation measures association rather than equality. RMSE and "
+        "DTW are distance measures, so lower values indicate closer agreement, "
+        "but their magnitudes are not directly interchangeable. The source "
+        "profile charts use supplied mean, median, and SD summaries; exact "
+        "individual-vector reconstruction would require the underlying 24-D "
+        "Real and Synthetic observations. The source files do not contain "
+        "Wasserstein distance, KS statistics, MMD, or a predefined composite "
+        "similarity score; none are inferred here. These metrics are "
+        "descriptive and do not establish statistical equivalence."
+    )
+
+
+def render_bm_am_quantitative_similarity():
+    """Render BM-AM Real-versus-Synthetic similarity metrics."""
+    st.subheader("Quantitative similarity analysis")
+    st.caption(
+        "Compare Real and ACGAN-generated feature distributions using the "
+        "three metrics available in the source files: Correlation, RMSE, and "
+        "DTW."
+    )
+
+    try:
+        dataframe = load_bm_am_similarity()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'similarity_master BM AM.zip' beside app.py, or extract "
+            "its five CSV files into similarity_master/, data/, or "
+            "assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_bm_am_similarity_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns(3)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bm_am_similarity_band",
+        )
+    with filter_2:
+        selected_condition = st.selectbox(
+            "Condition",
+            ["All Conditions", "BM", "AM"],
+            index=0,
+            key="bm_am_similarity_condition",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Metric",
+            list(BCF_ACF_SIMILARITY_METRICS),
+            index=0,
+            key="bm_am_similarity_metric",
+        )
+
+    selected_data = dataframe[dataframe["Band"] == selected_band].copy()
+    if selected_condition != "All Conditions":
+        selected_data = selected_data[
+            selected_data["Condition"] == selected_condition
+        ].copy()
+    if selected_data.empty:
+        st.warning("No similarity rows match the selected filters.")
+        return
+
+    cards = st.columns(5)
+    cards[0].metric("Comparisons", len(selected_data))
+    cards[1].metric(
+        "Avg Correlation ↑", f"{selected_data['Correlation'].mean():.3f}"
+    )
+    cards[2].metric("Avg RMSE ↓", f"{selected_data['RMSE'].mean():.3f}")
+    cards[3].metric("Avg DTW ↓", f"{selected_data['DTW'].mean():.4f}")
+    selected_format = BCF_ACF_SIMILARITY_METRICS[selected_metric]["format"]
+    cards[4].metric(
+        f"Median {selected_metric}",
+        f"{selected_data[selected_metric].median():{selected_format}}",
+    )
+
+    st.info(
+        "**Selected-view interpretation.** "
+        + get_bcf_acf_similarity_interpretation(
+            selected_data,
+            selected_band,
+            selected_condition,
+            selected_metric,
+            combined_condition_text="BM and AM",
+        )
+    )
+
+    st.markdown("#### Real–Synthetic feature-vector profiles")
+    profile_conditions = (
+        ["BM", "AM"]
+        if selected_condition == "All Conditions"
+        else [selected_condition]
+    )
+    if len(profile_conditions) == 2:
+        profile_tabs = st.tabs(["BM profile", "AM profile"])
+        profile_containers = zip(profile_tabs, profile_conditions)
+    else:
+        profile_containers = [(st.container(), profile_conditions[0])]
+
+    for profile_container, profile_condition in profile_containers:
+        with profile_container:
+            profile_figure = build_bcf_acf_similarity_profile_figure(
+                selected_data,
+                selected_band,
+                profile_condition,
+            )
+            st.plotly_chart(
+                profile_figure,
+                use_container_width=True,
+                key=(
+                    "bm_am_similarity_profile_"
+                    f"{profile_condition.lower()}"
+                ),
+            )
+    st.caption(
+        "Each profile contains 24 dimensions (four EEG channels × six "
+        "features). Solid lines show means, dotted lines show medians, and "
+        "shaded ribbons show mean ±1 SD on the scale stored in the source "
+        "CSV. The source contains summary statistics rather than individual "
+        "24-D vectors, so no individual sample lines are invented."
+    )
+
+    heatmap_figure = build_bcf_acf_similarity_heatmap(
+        selected_data,
+        selected_band,
+        selected_condition,
+        selected_metric,
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bm_am_similarity_heatmap",
+    )
+    if selected_metric == "Correlation":
+        st.caption(
+            "Greener cells indicate stronger positive correlation. When both "
+            "conditions are selected, each cell is their average."
+        )
+    else:
+        st.caption(
+            "Deeper purple cells indicate larger distance and therefore a "
+            "combination requiring closer review. When both conditions are "
+            "selected, each cell is their average."
+        )
+
+    band_figure = build_bcf_acf_similarity_band_overview(
+        dataframe,
+        condition_order=("BM", "AM"),
+        condition_colors={"BM": "#27465A", "AM": "#69B88B"},
+    )
+    st.plotly_chart(
+        band_figure,
+        use_container_width=True,
+        key="bm_am_similarity_band_overview",
+    )
+    st.caption(
+        "The three panels retain their original metric scales and separate "
+        "BM from AM; no cross-metric composite score is applied."
+    )
+
+    st.markdown("#### Feature combinations requiring closer review")
+    metric_column = BCF_ACF_SIMILARITY_METRICS[selected_metric]["column"]
+    if BCF_ACF_SIMILARITY_METRICS[selected_metric]["direction"] == "higher":
+        review_table = selected_data.nsmallest(10, metric_column)
+    else:
+        review_table = selected_data.nlargest(10, metric_column)
+    review_table = review_table[
+        [
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Correlation",
+            "RMSE",
+            "DTW",
+        ]
+    ].copy()
+    review_table = review_table.rename(columns={"Feature_Display": "Feature"})
+    review_table["Correlation"] = review_table["Correlation"].round(4)
+    review_table["RMSE"] = review_table["RMSE"].round(4)
+    review_table["DTW"] = review_table["DTW"].round(5)
+    st.dataframe(review_table, use_container_width=True, hide_index=True)
+
+    count_rows = 0
+    known_counts = []
+    if {"Real_N", "Synthetic_N"}.issubset(dataframe.columns):
+        count_mask = dataframe[["Real_N", "Synthetic_N"]].notna().all(axis=1)
+        count_rows = int(count_mask.sum())
+        known_counts = sorted(
+            dataframe.loc[count_mask, "Real_N"].astype(int).unique()
+        )
+    if count_rows and len(known_counts) == 1:
+        sample_note = (
+            f"Sample sizes are supplied for {count_rows} of "
+            f"{len(dataframe)} rows ({known_counts[0]:,} Real and "
+            f"{known_counts[0]:,} Synthetic); the remaining rows omit N and "
+            "are not imputed. "
+        )
+    else:
+        sample_note = (
+            "The source files do not provide complete Real_N and Synthetic_N "
+            "fields; sample counts are not imputed or used as analysis "
+            "weights. "
+        )
+    st.warning(
+        "**Methodological note.** "
+        + sample_note
+        + "Correlation measures association rather than equality. RMSE and "
+        "DTW are distance measures, so lower values indicate closer agreement, "
+        "but their magnitudes are not directly interchangeable. The source "
+        "profile charts use supplied mean, median, and SD summaries; exact "
+        "individual-vector reconstruction would require the underlying 24-D "
+        "Real and Synthetic observations. The source files do not contain "
+        "Wasserstein distance, KS statistics, MMD, or a predefined composite "
+        "similarity score; none are inferred here. These metrics are "
+        "descriptive and do not establish statistical equivalence."
+    )
+
+
+def get_bcf_acf_paired_band_from_name(file_name):
+    """Extract the analysis band from a BCF vs ACF statistics filename."""
+    normalized_name = Path(file_name).stem.lower()
+    for band in BCF_ACF_BAND_ORDER:
+        if band.lower() in normalized_name:
+            return band
+    return None
+
+
+def find_bcf_acf_paired_statistics_source():
+    """Find either the source ZIP or the five extracted statistics CSV files."""
+    for zip_path in BCF_ACF_PAIRED_STATISTICS_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BCF_ACF_PAIRED_STATISTICS_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "PairedStatistics_EffectSize_FDR_*_BCF_vs_ACF.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bcf_acf_paired_statistics():
+    """Load and validate the five BCF vs ACF paired-statistics tables."""
+    source_type, source = find_bcf_acf_paired_statistics_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BCF vs ACF paired-statistics data were not found. Keep "
+            "'paired_statistics_master BCF ACF.zip' beside app.py, or extract "
+            "the five PairedStatistics_EffectSize_FDR CSV files into "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+
+    frames = []
+
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_names = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "pairedstatistics_effectsize_fdr" in name.lower()
+                and "bcf" in name.lower()
+                and "acf" in name.lower()
+            ]
+
+            for csv_name in csv_names:
+                band = get_bcf_acf_paired_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe.insert(0, "Analysis_Band", band)
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcf_acf_paired_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe.insert(0, "Analysis_Band", band)
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BCF vs ACF PairedStatistics_EffectSize_FDR CSV files were "
+            "found in the configured source."
+        )
+
+    missing_bands = [
+        band
+        for band in BCF_ACF_BAND_ORDER
+        if band not in {frame["Analysis_Band"].iloc[0] for frame in frames}
+    ]
+    if missing_bands:
+        raise ValueError(
+            "The paired-statistics source is incomplete. Missing bands: "
+            + ", ".join(missing_bands)
+        )
+
+    validated_frames = []
+    numeric_columns = [
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "t_statistic",
+        "p_ttest",
+        "wilcoxon_statistic",
+        "p_wilcoxon",
+        "p_fdr_ttest",
+        "p_fdr_wilcoxon",
+    ]
+
+    for dataframe in frames:
+        missing_columns = BCF_ACF_PAIRED_REQUIRED_COLUMNS.difference(
+            dataframe.columns
+        )
+        if missing_columns:
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} is missing required "
+                "columns: " + ", ".join(sorted(missing_columns))
+            )
+
+        dataframe = dataframe.copy()
+        dataframe["Analysis_Band"] = (
+            dataframe["Analysis_Band"].astype(str).str.strip().str.title()
+        )
+        dataframe["channel"] = (
+            dataframe["channel"].astype(str).str.strip().str.upper()
+        )
+        dataframe["feature"] = dataframe["feature"].astype(str).str.strip()
+        dataframe["feature_type"] = (
+            dataframe["feature_type"].astype(str).str.strip().str.upper()
+        )
+        dataframe["effect_size_interpretation"] = (
+            dataframe["effect_size_interpretation"]
+            .astype(str)
+            .str.strip()
+            .str.title()
+        )
+
+        for column in numeric_columns:
+            dataframe[column] = pd.to_numeric(
+                dataframe[column], errors="coerce"
+            )
+
+        required_numeric = [
+            "n_subjects",
+            "mean_change",
+            "cohens_dz",
+            "p_ttest",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        if dataframe[required_numeric].isna().any().any():
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} contains missing or "
+                "non-numeric values in required statistical columns."
+            )
+
+        validated_frames.append(dataframe)
+
+    master = pd.concat(validated_frames, ignore_index=True)
+    duplicate_rows = master.duplicated(
+        ["Analysis_Band", "channel", "feature"], keep=False
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate band-channel-feature rows were found in the BCF vs ACF "
+            "paired-statistics source."
+        )
+
+    master["Analysis_Band"] = pd.Categorical(
+        master["Analysis_Band"],
+        categories=BCF_ACF_BAND_ORDER,
+        ordered=True,
+    )
+    master = master.sort_values(
+        ["Analysis_Band", "channel", "feature"]
+    ).reset_index(drop=True)
+    return master
+
+
+def format_bcf_acf_p_value(value):
+    """Format p-values and FDR-adjusted p-values for dashboard text."""
+    if pd.isna(value):
+        return "N/A"
+    if value < 0.0001:
+        return f"{value:.2e}"
+    return f"{value:.4f}"
+
+
+def get_bcf_acf_paired_band_statistics(dataframe, band, test_label):
+    """Return the principal paired-statistics metrics for one band and test."""
+    test_config = BCF_ACF_TEST_OPTIONS[test_label]
+    p_column = test_config["p_column"]
+    q_column = test_config["q_column"]
+    band_data = dataframe[
+        dataframe["Analysis_Band"].astype(str) == band
+    ].copy()
+
+    total = len(band_data)
+    nominal_significant = int((band_data[p_column] < 0.05).sum())
+    fdr_significant = int((band_data[q_column] < 0.05).sum())
+
+    strongest = band_data.loc[band_data["cohens_dz"].abs().idxmax()]
+    band_specific = band_data[
+        band_data["feature_type"].isin(["BP", "RP"])
+    ]
+    strongest_band_specific = band_specific.loc[
+        band_specific["cohens_dz"].abs().idxmax()
+    ]
+    smallest_q = band_data.loc[band_data[q_column].idxmin()]
+
+    return {
+        "data": band_data,
+        "p_column": p_column,
+        "q_column": q_column,
+        "statistic_column": test_config["statistic_column"],
+        "total": total,
+        "paired_subjects": int(band_data["n_subjects"].max()),
+        "nominal_significant": nominal_significant,
+        "fdr_significant": fdr_significant,
+        "strongest": strongest,
+        "strongest_band_specific": strongest_band_specific,
+        "smallest_q": smallest_q,
+    }
+
+
+def get_bcf_acf_paired_band_summary(dataframe, band, test_label):
+    """Create a concise English interpretation for one frequency band."""
+    summary = get_bcf_acf_paired_band_statistics(dataframe, band, test_label)
+    strongest = summary["strongest"]
+    strongest_band = summary["strongest_band_specific"]
+    smallest_q = summary["smallest_q"]
+
+    if summary["fdr_significant"] == 0:
+        significance_text = (
+            f"{summary['nominal_significant']} of {summary['total']} comparisons "
+            "had an unadjusted p-value below 0.05, but none remained "
+            "significant after FDR correction."
+        )
+    else:
+        significance_text = (
+            f"{summary['nominal_significant']} of {summary['total']} comparisons "
+            "had an unadjusted p-value below 0.05, and "
+            f"{summary['fdr_significant']} remained significant after FDR "
+            "correction."
+        )
+
+    effect_text = (
+        f"The largest absolute effect was {strongest['feature']} at "
+        f"{strongest['channel']} (Cohen's dz = {strongest['cohens_dz']:+.3f}, "
+        f"{strongest['effect_size_interpretation'].lower()})."
+    )
+    if (
+        strongest["feature"] != strongest_band["feature"]
+        or strongest["channel"] != strongest_band["channel"]
+    ):
+        effect_text += (
+            f" The strongest band-specific power effect was "
+            f"{strongest_band['feature']} at {strongest_band['channel']} "
+            f"(dz = {strongest_band['cohens_dz']:+.3f})."
+        )
+
+    return (
+        f"Using the {test_label}, {significance_text} {effect_text} The "
+        f"smallest FDR-adjusted p-value was "
+        f"{format_bcf_acf_p_value(smallest_q[summary['q_column']])}."
+    )
+
+
+def get_bcf_acf_paired_key_finding(dataframe):
+    """Create the cross-band key finding without combining or averaging p-values."""
+    t_nominal_counts = []
+    w_nominal_counts = []
+    t_fdr_count = 0
+    w_fdr_count = 0
+
+    for band in BCF_ACF_BAND_ORDER:
+        band_data = dataframe[
+            dataframe["Analysis_Band"].astype(str) == band
+        ]
+        t_nominal_counts.append(int((band_data["p_ttest"] < 0.05).sum()))
+        w_nominal_counts.append(int((band_data["p_wilcoxon"] < 0.05).sum()))
+        t_fdr_count += int((band_data["p_fdr_ttest"] < 0.05).sum())
+        w_fdr_count += int((band_data["p_fdr_wilcoxon"] < 0.05).sum())
+
+    strongest = dataframe.loc[dataframe["cohens_dz"].abs().idxmax()]
+    t_range = (
+        str(t_nominal_counts[0])
+        if len(set(t_nominal_counts)) == 1
+        else f"{min(t_nominal_counts)}-{max(t_nominal_counts)}"
+    )
+    w_range = (
+        str(w_nominal_counts[0])
+        if len(set(w_nominal_counts)) == 1
+        else f"{min(w_nominal_counts)}-{max(w_nominal_counts)}"
+    )
+    t_result_word = "result" if t_range == "1" else "results"
+    w_result_word = "result" if w_range == "1" else "results"
+
+    return (
+        "Each frequency-band file contains 24 channel-feature comparisons. "
+        f"The paired t-test identified {t_range} nominal {t_result_word} with "
+        f"p < 0.05 per band, and the Wilcoxon test identified {w_range} "
+        f"nominal {w_result_word}. "
+        f"After FDR correction, {t_fdr_count} t-test results and "
+        f"{w_fdr_count} Wilcoxon results remained significant across the five "
+        "band-specific correction families. The largest absolute effect was "
+        f"{strongest['feature']} at {strongest['channel']} in the "
+        f"{strongest['Analysis_Band']} file (Cohen's dz = "
+        f"{strongest['cohens_dz']:+.3f})."
+    )
+
+
+def build_bcf_acf_effect_size_figure(band_data, band):
+    """Build a horizontal Cohen's dz point plot for the selected band."""
+    plot_data = band_data.copy()
+    plot_data["Comparison"] = (
+        plot_data["channel"] + " | " + plot_data["feature"]
+    )
+    plot_data = plot_data.sort_values("cohens_dz")
+    comparison_order = plot_data["Comparison"].tolist()
+
+    color_map = {
+        "Negligible": "#9CA3AF",
+        "Small": "#60A5FA",
+        "Medium": "#F59E0B",
+        "Large": "#B91C1C",
+    }
+    figure = px.scatter(
+        plot_data,
+        x="cohens_dz",
+        y="Comparison",
+        color="effect_size_interpretation",
+        color_discrete_map=color_map,
+        category_orders={"Comparison": comparison_order},
+        hover_data={
+            "mean_change": ":.4g",
+            "p_ttest": ":.4f",
+            "p_wilcoxon": ":.4f",
+            "p_fdr_ttest": ":.4f",
+            "p_fdr_wilcoxon": ":.4f",
+            "effect_size_interpretation": False,
+        },
+        labels={
+            "cohens_dz": "Cohen's dz",
+            "effect_size_interpretation": "Effect size",
+        },
+        title=f"Cohen's dz by Channel and Feature<br><sup>{band}</sup>",
+    )
+    maximum_effect = max(1.0, float(plot_data["cohens_dz"].abs().max()) * 1.15)
+    figure.add_vline(x=0, line_color="#374151", line_width=1)
+    figure.update_traces(marker={"size": 11, "line": {"width": 0.5}})
+    figure.update_layout(
+        height=720,
+        margin=dict(l=20, r=20, t=75, b=20),
+        xaxis=dict(range=[-maximum_effect, maximum_effect], zeroline=False),
+        yaxis_title="",
+        legend_title_text="Effect magnitude",
+    )
+    return figure
+
+
+def build_bcf_acf_fdr_heatmap(band_data, band, test_label, q_column):
+    """Build the channel-by-feature FDR heatmap from the selected CSV values."""
+    preferred_features = [
+        f"{band} Band Power",
+        f"{band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["feature"].unique())
+    feature_order = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    available_channels = set(band_data["channel"].unique())
+    channel_order = [
+        channel for channel in BCF_ACF_CHANNEL_ORDER if channel in available_channels
+    ]
+
+    matrix = band_data.pivot(
+        index="channel", columns="feature", values=q_column
+    ).reindex(index=channel_order, columns=feature_order)
+
+    figure = go.Figure(
+        data=go.Heatmap(
+            z=matrix.values,
+            x=matrix.columns.tolist(),
+            y=matrix.index.tolist(),
+            zmin=0,
+            zmax=1,
+            colorscale=[
+                [0.0, "#B91C1C"],
+                [0.049, "#FCA5A5"],
+                [0.05, "#FEF3C7"],
+                [1.0, "#DCFCE7"],
+            ],
+            colorbar={"title": "FDR q"},
+            hovertemplate=(
+                "Channel: %{y}<br>Feature: %{x}<br>FDR q: %{z:.4f}"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    for row_index, channel in enumerate(matrix.index):
+        for column_index, feature in enumerate(matrix.columns):
+            value = matrix.iloc[row_index, column_index]
+            if pd.isna(value):
+                label = "N/A"
+                font_color = "#111827"
+            else:
+                label = f"{value:.3f}" + ("*" if value < 0.05 else "")
+                font_color = "white" if value < 0.05 else "#111827"
+            figure.add_annotation(
+                x=feature,
+                y=channel,
+                text=label,
+                showarrow=False,
+                font={"size": 12, "color": font_color},
+            )
+
+    figure.update_layout(
+        title=(
+            "FDR-Adjusted P-Value Heatmap<br>"
+            f"<sup>{band} | {test_label}</sup>"
+        ),
+        height=480,
+        margin=dict(l=20, r=20, t=80, b=95),
+        xaxis_title="Feature",
+        yaxis_title="EEG Channel",
+        xaxis={"tickangle": -25},
+    )
+    return figure
+
+
+def prepare_bcf_acf_paired_display_table(band_data, q_column, p_column):
+    """Prepare a readable results table while retaining the source values."""
+    table = band_data[
+        [
+            "channel",
+            "feature",
+            "mean_change",
+            "ci95_lower",
+            "ci95_upper",
+            "cohens_dz",
+            "effect_size_interpretation",
+            p_column,
+            q_column,
+        ]
+    ].copy()
+    table["95% CI for Mean Change"] = table.apply(
+        lambda row: (
+            f"[{row['ci95_lower']:.4g}, {row['ci95_upper']:.4g}]"
+            if pd.notna(row["ci95_lower"]) and pd.notna(row["ci95_upper"])
+            else "N/A"
+        ),
+        axis=1,
+    )
+    table["Significant After FDR"] = table[q_column] < 0.05
+    table = table.drop(columns=["ci95_lower", "ci95_upper"])
+    table = table.rename(
+        columns={
+            "channel": "Channel",
+            "feature": "Feature",
+            "mean_change": "Mean Change",
+            "cohens_dz": "Cohen's dz",
+            "effect_size_interpretation": "Effect",
+            p_column: "Raw p",
+            q_column: "FDR q",
+        }
+    )
+    column_order = [
+        "Channel",
+        "Feature",
+        "Mean Change",
+        "95% CI for Mean Change",
+        "Cohen's dz",
+        "Effect",
+        "Raw p",
+        "FDR q",
+        "Significant After FDR",
+    ]
+    return table[column_order].sort_values(["FDR q", "Raw p"])
+
+
+def render_bcf_acf_paired_statistics():
+    """Render the completed BCF vs ACF paired-statistics dashboard."""
+    st.subheader("Paired statistics, effect size, and FDR")
+    st.caption(
+        "This section evaluates within-subject BCF-to-ACF changes using paired "
+        "tests, Cohen's dz, confidence intervals for mean change, and "
+        "FDR-adjusted p-values."
+    )
+
+    try:
+        dataframe = load_bcf_acf_paired_statistics()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'paired_statistics_master BCF ACF.zip' beside app.py. The "
+            "dashboard can also read the five extracted CSV files from "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bcf_acf_paired_key_finding(dataframe)} "
+        "Nominal p-values should not be described as confirmed findings because "
+        "none of the results survived multiplicity correction."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCF_ACF_BAND_ORDER,
+            index=0,
+            key="bcf_acf_paired_band",
+        )
+    with filter_2:
+        selected_test = st.selectbox(
+            "Statistical test for p-value and FDR display",
+            list(BCF_ACF_TEST_OPTIONS),
+            index=0,
+            key="bcf_acf_paired_test",
+        )
+
+    summary = get_bcf_acf_paired_band_statistics(
+        dataframe, selected_band, selected_test
+    )
+    band_data = summary["data"]
+
+    metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
+    metric_1.metric("Comparisons Tested", summary["total"])
+    metric_2.metric(
+        "Nominal p < 0.05",
+        f"{summary['nominal_significant']} / {summary['total']}",
+    )
+    metric_3.metric(
+        "Significant After FDR",
+        f"{summary['fdr_significant']} / {summary['total']}",
+    )
+    metric_4.metric(
+        "Largest |Cohen's dz|",
+        f"{abs(summary['strongest']['cohens_dz']):.3f}",
+    )
+    metric_5.metric(
+        "Smallest FDR q",
+        format_bcf_acf_p_value(
+            summary["smallest_q"][summary["q_column"]]
+        ),
+    )
+
+    st.info(
+        f"**{selected_band} interpretation.** "
+        f"{get_bcf_acf_paired_band_summary(dataframe, selected_band, selected_test)}"
+    )
+
+    effect_figure = build_bcf_acf_effect_size_figure(
+        band_data, selected_band
+    )
+    st.plotly_chart(
+        effect_figure,
+        use_container_width=True,
+        key="bcf_acf_cohens_dz_plot",
+    )
+    st.caption(
+        "Positive Cohen's dz values indicate higher measurements under ACF; "
+        "negative values indicate lower measurements under ACF. The source CSV "
+        "does not contain confidence intervals for Cohen's dz, so the plot shows "
+        "effect-size point estimates only."
+    )
+
+    heatmap_figure = build_bcf_acf_fdr_heatmap(
+        band_data,
+        selected_band,
+        selected_test,
+        summary["q_column"],
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bcf_acf_fdr_heatmap",
+    )
+    st.caption(
+        "Lower FDR q-values indicate stronger multiplicity-adjusted evidence. "
+        "An asterisk marks q < 0.05; no cells meet that threshold in the current "
+        "BCF vs ACF files."
+    )
+
+    st.markdown("#### Results with the smallest FDR-adjusted p-values")
+    display_table = prepare_bcf_acf_paired_display_table(
+        band_data,
+        summary["q_column"],
+        summary["p_column"],
+    )
+    st.dataframe(
+        display_table.head(8),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BCF_ACF_BAND_ORDER:
+            st.markdown(
+                f"**{band}**  \n"
+                f"{get_bcf_acf_paired_band_summary(dataframe, band, selected_test)}"
+            )
+
+    with st.expander("View complete paired-statistics table", expanded=False):
+        st.dataframe(
+            display_table,
+            use_container_width=True,
+            hide_index=True,
+        )
+        download_columns = [
+            "Analysis_Band",
+            "channel",
+            "feature_band",
+            "feature_type",
+            "feature",
+            "n_subjects",
+            "mean_change",
+            "median_change",
+            "ci95_lower",
+            "ci95_upper",
+            "direction",
+            "cohens_dz",
+            "effect_size_interpretation",
+            "t_statistic",
+            "p_ttest",
+            "wilcoxon_statistic",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        st.download_button(
+            "Download selected band statistics (CSV)",
+            data=band_data[download_columns].to_csv(index=False).encode("utf-8"),
+            file_name=f"BCF_ACF_Paired_Statistics_{selected_band}.csv",
+            mime="text/csv",
+            key="bcf_acf_paired_download",
+        )
+
+    with st.expander("Statistical and data notes", expanded=False):
+        st.markdown(
+            """
+- Each band file contains 24 comparisons: four EEG channels multiplied by six features.
+- FDR correction is interpreted within each band file. P-values and FDR-adjusted p-values are not averaged across bands.
+- Entropy and the three Hjorth features are broadband measurements repeated in each band file. Select one band at a time to avoid treating these repetitions as independent tests.
+- Cohen's dz reports paired effect magnitude. Its sign follows ACF minus BCF.
+- The 95% confidence intervals in the table apply to the mean change, not to Cohen's dz.
+- A nominal p-value below 0.05 is not considered an FDR-corrected significant result when its q-value is 0.05 or greater.
+            """
+        )
+
+
+def find_bf_af_paired_statistics_source():
+    """Find either the BF vs AF source ZIP or its five extracted CSV files."""
+    for zip_path in BF_AF_PAIRED_STATISTICS_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BF_AF_PAIRED_STATISTICS_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob("PairedStatistics_EffectSize_FDR_*_BF_vs_AF.csv")
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bf_af_paired_statistics():
+    """Load and validate the five BF vs AF paired-statistics tables."""
+    source_type, source = find_bf_af_paired_statistics_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BF vs AF paired-statistics data were not found. Keep "
+            "'paired_statistics_master BF AF.zip' beside app.py, or extract "
+            "the five PairedStatistics_EffectSize_FDR CSV files into "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+
+    frames = []
+
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_names = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "pairedstatistics_effectsize_fdr" in name.lower()
+                and "_bf_vs_af" in Path(name).name.lower()
+            ]
+
+            for csv_name in csv_names:
+                band = get_bcf_acf_paired_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe.insert(0, "Analysis_Band", band)
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcf_acf_paired_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe.insert(0, "Analysis_Band", band)
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BF vs AF PairedStatistics_EffectSize_FDR CSV files were found "
+            "in the configured source."
+        )
+
+    available_bands = {
+        frame["Analysis_Band"].iloc[0] for frame in frames
+    }
+    missing_bands = [
+        band for band in BF_AF_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "The BF vs AF paired-statistics source is incomplete. Missing "
+            "bands: " + ", ".join(missing_bands)
+        )
+
+    validated_frames = []
+    numeric_columns = [
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "t_statistic",
+        "p_ttest",
+        "wilcoxon_statistic",
+        "p_wilcoxon",
+        "p_fdr_ttest",
+        "p_fdr_wilcoxon",
+    ]
+
+    for dataframe in frames:
+        missing_columns = BCF_ACF_PAIRED_REQUIRED_COLUMNS.difference(
+            dataframe.columns
+        )
+        if missing_columns:
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} is missing required "
+                "columns: " + ", ".join(sorted(missing_columns))
+            )
+
+        dataframe = dataframe.copy()
+        dataframe["Analysis_Band"] = (
+            dataframe["Analysis_Band"].astype(str).str.strip().str.title()
+        )
+        dataframe["channel"] = (
+            dataframe["channel"].astype(str).str.strip().str.upper()
+        )
+        dataframe["feature"] = dataframe["feature"].astype(str).str.strip()
+        dataframe["feature_type"] = (
+            dataframe["feature_type"].astype(str).str.strip().str.upper()
+        )
+        dataframe["effect_size_interpretation"] = (
+            dataframe["effect_size_interpretation"]
+            .astype(str)
+            .str.strip()
+            .str.title()
+        )
+
+        for column in numeric_columns:
+            dataframe[column] = pd.to_numeric(
+                dataframe[column], errors="coerce"
+            )
+
+        required_numeric = [
+            "n_subjects",
+            "mean_change",
+            "cohens_dz",
+            "p_ttest",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        if dataframe[required_numeric].isna().any().any():
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} contains missing or "
+                "non-numeric values in required statistical columns."
+            )
+
+        validated_frames.append(dataframe)
+
+    master = pd.concat(validated_frames, ignore_index=True)
+    duplicate_rows = master.duplicated(
+        ["Analysis_Band", "channel", "feature"], keep=False
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate band-channel-feature rows were found in the BF vs AF "
+            "paired-statistics source."
+        )
+
+    master["Analysis_Band"] = pd.Categorical(
+        master["Analysis_Band"],
+        categories=BF_AF_BAND_ORDER,
+        ordered=True,
+    )
+    return master.sort_values(
+        ["Analysis_Band", "channel", "feature"]
+    ).reset_index(drop=True)
+
+
+def get_bf_af_paired_key_finding(dataframe):
+    """Create the BF vs AF cross-band key finding from the source CSV values."""
+    t_nominal_by_band = {}
+    w_nominal_by_band = {}
+    t_fdr_total = 0
+    w_fdr_total = 0
+
+    for band in BF_AF_BAND_ORDER:
+        band_data = dataframe[
+            dataframe["Analysis_Band"].astype(str) == band
+        ]
+        t_nominal_by_band[band] = int((band_data["p_ttest"] < 0.05).sum())
+        w_nominal_by_band[band] = int((band_data["p_wilcoxon"] < 0.05).sum())
+        t_fdr_total += int((band_data["p_fdr_ttest"] < 0.05).sum())
+        w_fdr_total += int((band_data["p_fdr_wilcoxon"] < 0.05).sum())
+
+    strongest = dataframe.loc[dataframe["cohens_dz"].abs().idxmax()]
+    gamma = dataframe[
+        dataframe["Analysis_Band"].astype(str) == "Gamma"
+    ]
+    gamma_nominal = gamma.loc[gamma["p_wilcoxon"].idxmin()]
+
+    return (
+        "Each frequency-band file contains 24 channel-feature comparisons. "
+        "The paired t-test identified no unadjusted p-values below 0.05. "
+        f"The Wilcoxon test identified {sum(w_nominal_by_band.values())} "
+        "nominal result below 0.05: "
+        f"{gamma_nominal['feature']} at {gamma_nominal['channel']} in Gamma "
+        f"(p = {gamma_nominal['p_wilcoxon']:.6f}, "
+        f"FDR q = {gamma_nominal['p_fdr_wilcoxon']:.6f}). "
+        f"After FDR correction, {t_fdr_total} t-test results and "
+        f"{w_fdr_total} Wilcoxon results remained significant. The largest "
+        f"absolute effect was {strongest['feature']} at "
+        f"{strongest['channel']} in {strongest['Analysis_Band']} "
+        f"(Cohen's dz = {strongest['cohens_dz']:+.3f})."
+    )
+
+
+def render_bf_af_paired_statistics():
+    """Render the completed BF vs AF paired-statistics dashboard."""
+    st.subheader("Paired statistics, effect size, and FDR")
+    st.caption(
+        "This section evaluates within-subject BF-to-AF changes using paired "
+        "tests, Cohen's dz, confidence intervals for mean change, and "
+        "FDR-adjusted p-values."
+    )
+
+    try:
+        dataframe = load_bf_af_paired_statistics()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'paired_statistics_master BF AF.zip' beside app.py. The "
+            "dashboard can also read the five extracted CSV files from "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bf_af_paired_key_finding(dataframe)} "
+        "The Gamma Wilcoxon result is nominal only and should not be described "
+        "as significant after correction."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BF_AF_BAND_ORDER,
+            index=0,
+            key="bf_af_paired_band",
+        )
+    with filter_2:
+        selected_test = st.selectbox(
+            "Statistical test for p-value and FDR display",
+            list(BCF_ACF_TEST_OPTIONS),
+            index=0,
+            key="bf_af_paired_test",
+        )
+
+    summary = get_bcf_acf_paired_band_statistics(
+        dataframe, selected_band, selected_test
+    )
+    band_data = summary["data"]
+
+    metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
+    metric_1.metric("Comparisons Tested", summary["total"])
+    metric_2.metric(
+        "Nominal p < 0.05",
+        f"{summary['nominal_significant']} / {summary['total']}",
+    )
+    metric_3.metric(
+        "Significant After FDR",
+        f"{summary['fdr_significant']} / {summary['total']}",
+    )
+    metric_4.metric(
+        "Largest |Cohen's dz|",
+        f"{abs(summary['strongest']['cohens_dz']):.3f}",
+    )
+    metric_5.metric(
+        "Smallest FDR q",
+        format_bcf_acf_p_value(
+            summary["smallest_q"][summary["q_column"]]
+        ),
+    )
+
+    st.info(
+        f"**{selected_band} interpretation.** "
+        f"{get_bcf_acf_paired_band_summary(dataframe, selected_band, selected_test)}"
+    )
+
+    effect_figure = build_bcf_acf_effect_size_figure(
+        band_data, selected_band
+    )
+    st.plotly_chart(
+        effect_figure,
+        use_container_width=True,
+        key="bf_af_cohens_dz_plot",
+    )
+    st.caption(
+        "Positive Cohen's dz values indicate higher measurements under AF; "
+        "negative values indicate lower measurements under AF. The source CSV "
+        "does not contain confidence intervals for Cohen's dz, so the plot "
+        "shows effect-size point estimates only."
+    )
+
+    heatmap_figure = build_bcf_acf_fdr_heatmap(
+        band_data,
+        selected_band,
+        selected_test,
+        summary["q_column"],
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bf_af_fdr_heatmap",
+    )
+    st.caption(
+        "Lower FDR q-values indicate stronger multiplicity-adjusted evidence. "
+        "An asterisk marks q < 0.05; no cells meet that threshold in the "
+        "current BF vs AF files."
+    )
+
+    st.markdown("#### Results with the smallest FDR-adjusted p-values")
+    display_table = prepare_bcf_acf_paired_display_table(
+        band_data,
+        summary["q_column"],
+        summary["p_column"],
+    )
+    st.dataframe(
+        display_table.head(8),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BF_AF_BAND_ORDER:
+            st.markdown(
+                f"**{band}**  \n"
+                f"{get_bcf_acf_paired_band_summary(dataframe, band, selected_test)}"
+            )
+
+    with st.expander("View complete paired-statistics table", expanded=False):
+        st.dataframe(
+            display_table,
+            use_container_width=True,
+            hide_index=True,
+        )
+        download_columns = [
+            "Analysis_Band",
+            "channel",
+            "feature_band",
+            "feature_type",
+            "feature",
+            "n_subjects",
+            "mean_change",
+            "median_change",
+            "ci95_lower",
+            "ci95_upper",
+            "direction",
+            "cohens_dz",
+            "effect_size_interpretation",
+            "t_statistic",
+            "p_ttest",
+            "wilcoxon_statistic",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        st.download_button(
+            "Download selected band statistics (CSV)",
+            data=band_data[download_columns].to_csv(index=False).encode("utf-8"),
+            file_name=f"BF_AF_Paired_Statistics_{selected_band}.csv",
+            mime="text/csv",
+            key="bf_af_paired_download",
+        )
+
+    with st.expander("Statistical and data notes", expanded=False):
+        st.markdown(
+            """
+- Each band file contains 24 comparisons: four EEG channels multiplied by six features.
+- FDR correction is interpreted within each band file. P-values and FDR-adjusted p-values are not averaged across bands.
+- Entropy and the three Hjorth features are broadband measurements repeated in each band file. Select one band at a time to avoid treating these repetitions as independent tests.
+- Cohen's dz reports paired effect magnitude. Its sign follows AF minus BF.
+- The 95% confidence intervals in the table apply to the mean change, not to Cohen's dz.
+- Gamma Band Power at AF7 has a nominal Wilcoxon p-value of 0.027344, but its FDR-adjusted q-value is 0.656250.
+- A nominal p-value below 0.05 is not considered an FDR-corrected significant result when its q-value is 0.05 or greater.
+            """
+        )
+
+
+def find_bcm_acm_paired_statistics_source():
+    """Find either the BCM vs ACM source ZIP or its five extracted CSV files."""
+    for zip_path in BCM_ACM_PAIRED_STATISTICS_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BCM_ACM_PAIRED_STATISTICS_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob(
+                "PairedStatistics_EffectSize_FDR_*_BCM_vs_ACM.csv"
+            )
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bcm_acm_paired_statistics():
+    """Load and validate the five BCM vs ACM paired-statistics tables."""
+    source_type, source = find_bcm_acm_paired_statistics_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BCM vs ACM paired-statistics data were not found. Keep "
+            "'paired_statistics_master BCM ACM.zip' beside app.py, or extract "
+            "the five PairedStatistics_EffectSize_FDR CSV files into "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+
+    frames = []
+
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_names = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "pairedstatistics_effectsize_fdr" in name.lower()
+                and "_bcm_vs_acm" in Path(name).name.lower()
+            ]
+
+            for csv_name in csv_names:
+                band = get_bcf_acf_paired_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe.insert(0, "Analysis_Band", band)
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcf_acf_paired_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe.insert(0, "Analysis_Band", band)
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BCM vs ACM PairedStatistics_EffectSize_FDR CSV files were "
+            "found in the configured source."
+        )
+
+    available_bands = {
+        frame["Analysis_Band"].iloc[0] for frame in frames
+    }
+    missing_bands = [
+        band for band in BCM_ACM_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "The BCM vs ACM paired-statistics source is incomplete. Missing "
+            "bands: " + ", ".join(missing_bands)
+        )
+
+    validated_frames = []
+    numeric_columns = [
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "t_statistic",
+        "p_ttest",
+        "wilcoxon_statistic",
+        "p_wilcoxon",
+        "p_fdr_ttest",
+        "p_fdr_wilcoxon",
+    ]
+
+    for dataframe in frames:
+        missing_columns = BCF_ACF_PAIRED_REQUIRED_COLUMNS.difference(
+            dataframe.columns
+        )
+        if missing_columns:
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} is missing required "
+                "columns: " + ", ".join(sorted(missing_columns))
+            )
+
+        dataframe = dataframe.copy()
+        dataframe["Analysis_Band"] = (
+            dataframe["Analysis_Band"].astype(str).str.strip().str.title()
+        )
+        dataframe["channel"] = (
+            dataframe["channel"].astype(str).str.strip().str.upper()
+        )
+        dataframe["feature"] = dataframe["feature"].astype(str).str.strip()
+        dataframe["feature_type"] = (
+            dataframe["feature_type"].astype(str).str.strip().str.upper()
+        )
+        dataframe["effect_size_interpretation"] = (
+            dataframe["effect_size_interpretation"]
+            .astype(str)
+            .str.strip()
+            .str.title()
+        )
+
+        for column in numeric_columns:
+            dataframe[column] = pd.to_numeric(
+                dataframe[column], errors="coerce"
+            )
+
+        required_numeric = [
+            "n_subjects",
+            "mean_change",
+            "cohens_dz",
+            "p_ttest",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        if dataframe[required_numeric].isna().any().any():
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} contains missing or "
+                "non-numeric values in required statistical columns."
+            )
+
+        validated_frames.append(dataframe)
+
+    master = pd.concat(validated_frames, ignore_index=True)
+    duplicate_rows = master.duplicated(
+        ["Analysis_Band", "channel", "feature"], keep=False
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate band-channel-feature rows were found in the BCM vs ACM "
+            "paired-statistics source."
+        )
+
+    rows_per_band = master.groupby("Analysis_Band").size()
+    incomplete_bands = rows_per_band[rows_per_band != 24]
+    if not incomplete_bands.empty:
+        details = ", ".join(
+            f"{band}: {count}" for band, count in incomplete_bands.items()
+        )
+        raise ValueError(
+            "Each BCM vs ACM band must contain 24 channel-feature "
+            f"comparisons. Found {details}."
+        )
+
+    master["Analysis_Band"] = pd.Categorical(
+        master["Analysis_Band"],
+        categories=BCM_ACM_BAND_ORDER,
+        ordered=True,
+    )
+    return master.sort_values(
+        ["Analysis_Band", "channel", "feature"]
+    ).reset_index(drop=True)
+
+
+def get_bcm_acm_paired_key_finding(dataframe):
+    """Create the BCM vs ACM cross-band key finding from source values."""
+    t_nominal_counts = []
+    w_nominal_counts = []
+    t_fdr_count = 0
+    w_fdr_count = 0
+
+    for band in BCM_ACM_BAND_ORDER:
+        band_data = dataframe[
+            dataframe["Analysis_Band"].astype(str) == band
+        ]
+        t_nominal_counts.append(int((band_data["p_ttest"] < 0.05).sum()))
+        w_nominal_counts.append(int((band_data["p_wilcoxon"] < 0.05).sum()))
+        t_fdr_count += int((band_data["p_fdr_ttest"] < 0.05).sum())
+        w_fdr_count += int((band_data["p_fdr_wilcoxon"] < 0.05).sum())
+
+    strongest = dataframe.loc[dataframe["cohens_dz"].abs().idxmax()]
+    t_range = (
+        str(t_nominal_counts[0])
+        if len(set(t_nominal_counts)) == 1
+        else f"{min(t_nominal_counts)}-{max(t_nominal_counts)}"
+    )
+    w_range = (
+        str(w_nominal_counts[0])
+        if len(set(w_nominal_counts)) == 1
+        else f"{min(w_nominal_counts)}-{max(w_nominal_counts)}"
+    )
+    t_result_word = "result" if t_range == "1" else "results"
+    w_result_word = "result" if w_range == "1" else "results"
+
+    return (
+        "Each frequency-band file contains 24 channel-feature comparisons. "
+        f"The paired t-test identified {t_range} nominal {t_result_word} with "
+        f"p < 0.05 per band, and the Wilcoxon test identified {w_range} "
+        f"nominal {w_result_word} per band. "
+        f"After FDR correction, {t_fdr_count} t-test results and "
+        f"{w_fdr_count} Wilcoxon results remained significant across the five "
+        "band-specific correction families. The largest absolute effect was "
+        f"{strongest['feature']} at {strongest['channel']} "
+        f"(Cohen's dz = {strongest['cohens_dz']:+.3f}). Because this is a "
+        "broadband Hjorth feature repeated in every band file, it represents "
+        "one shared comparison rather than five independent findings."
+    )
+
+
+def render_bcm_acm_paired_statistics():
+    """Render the completed BCM vs ACM paired-statistics dashboard."""
+    st.subheader("Paired statistics, effect size, and FDR")
+    st.caption(
+        "This section evaluates within-subject BCM-to-ACM changes using paired "
+        "tests, Cohen's dz, confidence intervals for mean change, and "
+        "FDR-adjusted p-values."
+    )
+
+    try:
+        dataframe = load_bcm_acm_paired_statistics()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'paired_statistics_master BCM ACM.zip' beside app.py. The "
+            "dashboard can also read the five extracted CSV files from "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bcm_acm_paired_key_finding(dataframe)} "
+        "The nominal TP9 Hjorth Complexity result did not survive FDR "
+        "correction and must not be described as FDR-significant."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BCM_ACM_BAND_ORDER,
+            index=0,
+            key="bcm_acm_paired_band",
+        )
+    with filter_2:
+        selected_test = st.selectbox(
+            "Statistical test for p-value and FDR display",
+            list(BCF_ACF_TEST_OPTIONS),
+            index=0,
+            key="bcm_acm_paired_test",
+        )
+
+    summary = get_bcf_acf_paired_band_statistics(
+        dataframe, selected_band, selected_test
+    )
+    band_data = summary["data"]
+
+    metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
+    metric_1.metric("Comparisons Tested", summary["total"])
+    metric_2.metric(
+        "Nominal p < 0.05",
+        f"{summary['nominal_significant']} / {summary['total']}",
+    )
+    metric_3.metric(
+        "Significant After FDR",
+        f"{summary['fdr_significant']} / {summary['total']}",
+    )
+    metric_4.metric(
+        "Largest |Cohen's dz|",
+        f"{abs(summary['strongest']['cohens_dz']):.3f}",
+    )
+    metric_5.metric(
+        "Smallest FDR q",
+        format_bcf_acf_p_value(
+            summary["smallest_q"][summary["q_column"]]
+        ),
+    )
+
+    st.info(
+        f"**{selected_band} interpretation.** "
+        f"{get_bcf_acf_paired_band_summary(dataframe, selected_band, selected_test)}"
+    )
+
+    effect_figure = build_bcf_acf_effect_size_figure(
+        band_data, selected_band
+    )
+    st.plotly_chart(
+        effect_figure,
+        use_container_width=True,
+        key="bcm_acm_cohens_dz_plot",
+    )
+    st.caption(
+        "Positive Cohen's dz values indicate higher measurements under ACM; "
+        "negative values indicate lower measurements under ACM. The source CSV "
+        "does not contain confidence intervals for Cohen's dz, so the plot "
+        "shows effect-size point estimates only."
+    )
+
+    heatmap_figure = build_bcf_acf_fdr_heatmap(
+        band_data,
+        selected_band,
+        selected_test,
+        summary["q_column"],
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bcm_acm_fdr_heatmap",
+    )
+    st.caption(
+        "Lower FDR q-values indicate stronger multiplicity-adjusted evidence. "
+        "An asterisk marks q < 0.05; no cells meet that threshold in the "
+        "current BCM vs ACM files."
+    )
+
+    st.markdown("#### Results with the smallest FDR-adjusted p-values")
+    display_table = prepare_bcf_acf_paired_display_table(
+        band_data,
+        summary["q_column"],
+        summary["p_column"],
+    )
+    st.dataframe(
+        display_table.head(8),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BCM_ACM_BAND_ORDER:
+            st.markdown(
+                f"**{band}**  \n"
+                f"{get_bcf_acf_paired_band_summary(dataframe, band, selected_test)}"
+            )
+
+    with st.expander("View complete paired-statistics table", expanded=False):
+        st.dataframe(
+            display_table,
+            use_container_width=True,
+            hide_index=True,
+        )
+        download_columns = [
+            "Analysis_Band",
+            "channel",
+            "feature_band",
+            "feature_type",
+            "feature",
+            "n_subjects",
+            "mean_change",
+            "median_change",
+            "ci95_lower",
+            "ci95_upper",
+            "direction",
+            "cohens_dz",
+            "effect_size_interpretation",
+            "t_statistic",
+            "p_ttest",
+            "wilcoxon_statistic",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        st.download_button(
+            "Download selected band statistics (CSV)",
+            data=band_data[download_columns].to_csv(index=False).encode("utf-8"),
+            file_name=f"BCM_ACM_Paired_Statistics_{selected_band}.csv",
+            mime="text/csv",
+            key="bcm_acm_paired_download",
+        )
+
+    with st.expander("Statistical and data notes", expanded=False):
+        st.markdown(
+            """
+- Each band file contains 24 comparisons: four EEG channels multiplied by six features.
+- FDR correction is interpreted within each band file. P-values and FDR-adjusted p-values are not averaged across bands.
+- Entropy and the three Hjorth features are broadband measurements repeated in each band file. Select one band at a time to avoid treating these repetitions as independent tests.
+- Cohen's dz reports paired effect magnitude. Its sign follows ACM minus BCM.
+- The 95% confidence intervals in the table apply to the mean change, not to Cohen's dz.
+- Hjorth Complexity at TP9 has paired t-test p = 0.008642 and FDR q = 0.207402; its Wilcoxon p = 0.013672 and FDR q = 0.328125.
+- A nominal p-value below 0.05 is not considered an FDR-corrected significant result when its q-value is 0.05 or greater.
+            """
+        )
+
+
+def find_bm_am_paired_statistics_source():
+    """Find either the BM vs AM source ZIP or its five extracted CSV files."""
+    for zip_path in BM_AM_PAIRED_STATISTICS_ZIPS:
+        if zip_path.exists():
+            return "zip", zip_path
+
+    csv_files = []
+    for directory in BM_AM_PAIRED_STATISTICS_DIRECTORIES:
+        if not directory.exists():
+            continue
+        csv_files.extend(
+            directory.rglob("PairedStatistics_EffectSize_FDR_*_BM_vs_AM.csv")
+        )
+
+    unique_files = sorted({path.resolve() for path in csv_files})
+    if unique_files:
+        return "csv", unique_files
+    return None, None
+
+
+@st.cache_data
+def load_bm_am_paired_statistics():
+    """Load and validate the five BM vs AM paired-statistics tables."""
+    source_type, source = find_bm_am_paired_statistics_source()
+    if source is None:
+        raise FileNotFoundError(
+            "BM vs AM paired-statistics data were not found. Keep "
+            "'paired_statistics_master BM AM.zip' beside app.py, or extract "
+            "the five PairedStatistics_EffectSize_FDR CSV files into "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+
+    frames = []
+
+    if source_type == "zip":
+        with ZipFile(source) as archive:
+            csv_names = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "pairedstatistics_effectsize_fdr" in name.lower()
+                and "_bm_vs_am" in Path(name).name.lower()
+            ]
+
+            for csv_name in csv_names:
+                band = get_bcf_acf_paired_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe.insert(0, "Analysis_Band", band)
+                dataframe["Source_File"] = Path(csv_name).name
+                frames.append(dataframe)
+    else:
+        for csv_path in source:
+            band = get_bcf_acf_paired_band_from_name(csv_path.name)
+            if band is None:
+                continue
+            dataframe = pd.read_csv(csv_path)
+            dataframe.insert(0, "Analysis_Band", band)
+            dataframe["Source_File"] = csv_path.name
+            frames.append(dataframe)
+
+    if not frames:
+        raise FileNotFoundError(
+            "No BM vs AM PairedStatistics_EffectSize_FDR CSV files were found "
+            "in the configured source."
+        )
+
+    available_bands = {
+        frame["Analysis_Band"].iloc[0] for frame in frames
+    }
+    missing_bands = [
+        band for band in BM_AM_BAND_ORDER if band not in available_bands
+    ]
+    if missing_bands:
+        raise ValueError(
+            "The BM vs AM paired-statistics source is incomplete. Missing "
+            "bands: " + ", ".join(missing_bands)
+        )
+
+    validated_frames = []
+    numeric_columns = [
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "t_statistic",
+        "p_ttest",
+        "wilcoxon_statistic",
+        "p_wilcoxon",
+        "p_fdr_ttest",
+        "p_fdr_wilcoxon",
+    ]
+
+    for dataframe in frames:
+        # The supplied Beta table omits the two test-statistic columns while
+        # retaining its raw p-values, FDR q-values, confidence intervals, and
+        # effect sizes. Preserve that source limitation explicitly as N/A.
+        for optional_column in ["t_statistic", "wilcoxon_statistic"]:
+            if optional_column not in dataframe.columns:
+                dataframe[optional_column] = pd.NA
+
+        missing_columns = BCF_ACF_PAIRED_REQUIRED_COLUMNS.difference(
+            dataframe.columns
+        )
+        if missing_columns:
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} is missing required "
+                "columns: " + ", ".join(sorted(missing_columns))
+            )
+
+        dataframe = dataframe.copy()
+        dataframe["Analysis_Band"] = (
+            dataframe["Analysis_Band"].astype(str).str.strip().str.title()
+        )
+        dataframe["channel"] = (
+            dataframe["channel"].astype(str).str.strip().str.upper()
+        )
+        dataframe["feature"] = dataframe["feature"].astype(str).str.strip()
+        dataframe["feature_type"] = (
+            dataframe["feature_type"].astype(str).str.strip().str.upper()
+        )
+        dataframe["effect_size_interpretation"] = (
+            dataframe["effect_size_interpretation"]
+            .astype(str)
+            .str.strip()
+            .str.title()
+        )
+
+        for column in numeric_columns:
+            dataframe[column] = pd.to_numeric(
+                dataframe[column], errors="coerce"
+            )
+
+        required_numeric = [
+            "n_subjects",
+            "mean_change",
+            "cohens_dz",
+            "p_ttest",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        if dataframe[required_numeric].isna().any().any():
+            raise ValueError(
+                f"{dataframe['Source_File'].iloc[0]} contains missing or "
+                "non-numeric values in required statistical columns."
+            )
+
+        validated_frames.append(dataframe)
+
+    master = pd.concat(validated_frames, ignore_index=True)
+    duplicate_rows = master.duplicated(
+        ["Analysis_Band", "channel", "feature"], keep=False
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate band-channel-feature rows were found in the BM vs AM "
+            "paired-statistics source."
+        )
+
+    rows_per_band = master.groupby("Analysis_Band").size()
+    incomplete_bands = rows_per_band[rows_per_band != 24]
+    if not incomplete_bands.empty:
+        details = ", ".join(
+            f"{band}: {count}" for band, count in incomplete_bands.items()
+        )
+        raise ValueError(
+            "Each BM vs AM band must contain 24 channel-feature comparisons. "
+            f"Found {details}."
+        )
+
+    master["Analysis_Band"] = pd.Categorical(
+        master["Analysis_Band"],
+        categories=BM_AM_BAND_ORDER,
+        ordered=True,
+    )
+    return master.sort_values(
+        ["Analysis_Band", "channel", "feature"]
+    ).reset_index(drop=True)
+
+
+def get_bm_am_paired_key_finding(dataframe):
+    """Create the BM vs AM cross-band key finding from source values."""
+    t_nominal_counts = []
+    w_nominal_counts = []
+    t_fdr_count = 0
+    w_fdr_count = 0
+
+    for band in BM_AM_BAND_ORDER:
+        band_data = dataframe[
+            dataframe["Analysis_Band"].astype(str) == band
+        ]
+        t_nominal_counts.append(int((band_data["p_ttest"] < 0.05).sum()))
+        w_nominal_counts.append(int((band_data["p_wilcoxon"] < 0.05).sum()))
+        t_fdr_count += int((band_data["p_fdr_ttest"] < 0.05).sum())
+        w_fdr_count += int((band_data["p_fdr_wilcoxon"] < 0.05).sum())
+
+    strongest = dataframe.loc[dataframe["cohens_dz"].abs().idxmax()]
+    t_range = (
+        str(t_nominal_counts[0])
+        if len(set(t_nominal_counts)) == 1
+        else f"{min(t_nominal_counts)}-{max(t_nominal_counts)}"
+    )
+    w_range = (
+        str(w_nominal_counts[0])
+        if len(set(w_nominal_counts)) == 1
+        else f"{min(w_nominal_counts)}-{max(w_nominal_counts)}"
+    )
+    t_result_word = "result" if t_range == "1" else "results"
+    w_result_word = "result" if w_range == "1" else "results"
+    smallest_w_q = float(dataframe["p_fdr_wilcoxon"].min())
+
+    return (
+        "Each frequency-band file contains 24 channel-feature comparisons. "
+        f"The paired t-test identified {t_range} nominal {t_result_word} with "
+        f"p < 0.05 per band, while the Wilcoxon test identified {w_range} "
+        f"nominal {w_result_word} per band. After FDR correction, "
+        f"{t_fdr_count} t-test results and {w_fdr_count} Wilcoxon results "
+        "remained significant across the five band-specific correction "
+        "families. The largest absolute effect was "
+        f"{strongest['feature']} at {strongest['channel']} in "
+        f"{strongest['Analysis_Band']} (Cohen's dz = "
+        f"{strongest['cohens_dz']:+.3f}). The smallest Wilcoxon FDR q-value "
+        f"was {smallest_w_q:.4f}."
+    )
+
+
+def render_bm_am_paired_statistics():
+    """Render the completed BM vs AM paired-statistics dashboard."""
+    st.subheader("Paired statistics, effect size, and FDR")
+    st.caption(
+        "This section evaluates within-subject BM-to-AM changes using paired "
+        "tests, Cohen's dz, confidence intervals for mean change, and "
+        "FDR-adjusted p-values."
+    )
+
+    try:
+        dataframe = load_bm_am_paired_statistics()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep 'paired_statistics_master BM AM.zip' beside app.py. The "
+            "dashboard can also read the five extracted CSV files from "
+            "paired_statistics_master/, data/, or assets/data/."
+        )
+        return
+
+    st.success(
+        f"**Key finding.** {get_bm_am_paired_key_finding(dataframe)} "
+        "The nominal Wilcoxon results did not survive FDR correction and "
+        "must not be described as FDR-significant."
+    )
+
+    filter_1, filter_2 = st.columns(2)
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            BM_AM_BAND_ORDER,
+            index=0,
+            key="bm_am_paired_band",
+        )
+    with filter_2:
+        selected_test = st.selectbox(
+            "Statistical test for p-value and FDR display",
+            list(BCF_ACF_TEST_OPTIONS),
+            index=0,
+            key="bm_am_paired_test",
+        )
+
+    summary = get_bcf_acf_paired_band_statistics(
+        dataframe, selected_band, selected_test
+    )
+    band_data = summary["data"]
+
+    metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
+    metric_1.metric("Comparisons Tested", summary["total"])
+    metric_2.metric(
+        "Nominal p < 0.05",
+        f"{summary['nominal_significant']} / {summary['total']}",
+    )
+    metric_3.metric(
+        "Significant After FDR",
+        f"{summary['fdr_significant']} / {summary['total']}",
+    )
+    metric_4.metric(
+        "Largest |Cohen's dz|",
+        f"{abs(summary['strongest']['cohens_dz']):.3f}",
+    )
+    metric_5.metric(
+        "Smallest FDR q",
+        format_bcf_acf_p_value(
+            summary["smallest_q"][summary["q_column"]]
+        ),
+    )
+
+    st.info(
+        f"**{selected_band} interpretation.** "
+        f"{get_bcf_acf_paired_band_summary(dataframe, selected_band, selected_test)}"
+    )
+
+    effect_figure = build_bcf_acf_effect_size_figure(
+        band_data, selected_band
+    )
+    st.plotly_chart(
+        effect_figure,
+        use_container_width=True,
+        key="bm_am_cohens_dz_plot",
+    )
+    st.caption(
+        "Positive Cohen's dz values indicate higher measurements under AM; "
+        "negative values indicate lower measurements under AM. The source CSV "
+        "does not contain confidence intervals for Cohen's dz, so the plot "
+        "shows effect-size point estimates only."
+    )
+
+    heatmap_figure = build_bcf_acf_fdr_heatmap(
+        band_data,
+        selected_band,
+        selected_test,
+        summary["q_column"],
+    )
+    st.plotly_chart(
+        heatmap_figure,
+        use_container_width=True,
+        key="bm_am_fdr_heatmap",
+    )
+    st.caption(
+        "Lower FDR q-values indicate stronger multiplicity-adjusted evidence. "
+        "An asterisk marks q < 0.05; no cells meet that threshold in the "
+        "current BM vs AM files."
+    )
+
+    st.markdown("#### Results with the smallest FDR-adjusted p-values")
+    display_table = prepare_bcf_acf_paired_display_table(
+        band_data,
+        summary["q_column"],
+        summary["p_column"],
+    )
+    st.dataframe(
+        display_table.head(8),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    with st.expander("View summaries for all frequency bands", expanded=False):
+        for band in BM_AM_BAND_ORDER:
+            st.markdown(
+                f"**{band}**  \n"
+                f"{get_bcf_acf_paired_band_summary(dataframe, band, selected_test)}"
+            )
+
+    with st.expander("View complete paired-statistics table", expanded=False):
+        st.dataframe(
+            display_table,
+            use_container_width=True,
+            hide_index=True,
+        )
+        download_columns = [
+            "Analysis_Band",
+            "channel",
+            "feature_band",
+            "feature_type",
+            "feature",
+            "n_subjects",
+            "mean_change",
+            "median_change",
+            "ci95_lower",
+            "ci95_upper",
+            "direction",
+            "cohens_dz",
+            "effect_size_interpretation",
+            "t_statistic",
+            "p_ttest",
+            "wilcoxon_statistic",
+            "p_wilcoxon",
+            "p_fdr_ttest",
+            "p_fdr_wilcoxon",
+        ]
+        st.download_button(
+            "Download selected band statistics (CSV)",
+            data=band_data[download_columns].to_csv(index=False).encode("utf-8"),
+            file_name=f"BM_AM_Paired_Statistics_{selected_band}.csv",
+            mime="text/csv",
+            key="bm_am_paired_download",
+        )
+
+    with st.expander("Statistical and data notes", expanded=False):
+        st.markdown(
+            """
+- Each band file contains 24 comparisons: four EEG channels multiplied by six features.
+- FDR correction is interpreted within each band file. P-values and FDR-adjusted p-values are not averaged across bands.
+- Entropy and the three Hjorth features are broadband measurements repeated in each band file. Select one band at a time to avoid treating these repetitions as independent tests.
+- Cohen's dz reports paired effect magnitude. Its sign follows AM minus BM.
+- The 95% confidence intervals in the table apply to the mean change, not to Cohen's dz.
+- The paired t-test has no nominal p-values below 0.05 in any band. Wilcoxon has 2-4 nominal results per band, but none remains significant after FDR correction.
+- In Delta, Hjorth Activity at TP10 and Delta Band Power at AF8 share the smallest Wilcoxon FDR q-value (q = 0.117188).
+- A nominal p-value below 0.05 is not considered an FDR-corrected significant result when its q-value is 0.05 or greater.
+            """
+        )
+
+
+def render_analysis_placeholder(title, scope, description, planned_outputs):
+    """Render a consistent insertion point for analysis results not yet linked to the app."""
+    st.subheader(title)
+    with st.container(border=True):
+        st.info(f"The {scope} analysis output has not been connected to this dashboard yet.")
+        st.write(description)
+
+    with st.expander("Planned outputs", expanded=False):
+        for output in planned_outputs:
+            st.markdown(f"- {output}")
+
+
+def render_subject_10_analysis(comparison_name, test_results=None, train_results=None):
+    """Render the five-part statistical and synthetic analysis workspace."""
+    st.subheader(f"Analysis: {comparison_name}")
+    st.caption(
+        "Classification accuracy remains in Results. This workspace is reserved for "
+        "pre-post statistics and real-versus-synthetic validation."
+    )
+
+    (
+        subject_level_tab,
+        paired_statistics_tab,
+        pre_post_visuals_tab,
+        synthetic_quality_tab,
+        similarity_tab,
+    ) = st.tabs(
+        [
+            "Subject-Level Analysis",
+            "Paired Statistics",
+            "Pre-Post Visualizations",
+            "Synthetic Feature Quality",
+            "Quantitative Similarity",
+        ]
+    )
+
+    with subject_level_tab:
+        if comparison_name == "BCF vs ACF":
+            render_bcf_acf_subject_level()
+        elif comparison_name == "BF vs AF":
+            render_bf_af_subject_level()
+        elif comparison_name == "BCM vs ACM":
+            render_bcm_acm_subject_level()
+        elif comparison_name == "BM vs AM":
+            render_bm_am_subject_level()
+        else:
+            render_analysis_placeholder(
+                "Pre-post subject-level analysis",
+                comparison_name,
+                "This section will show the paired change for every subject while preserving "
+                "the identity of each pre-post observation.",
+                [
+                    "Per-subject pre and post values",
+                    "Absolute and percentage change (delta)",
+                    "Direction of change for each subject",
+                    "Responder and non-responder summary, when defined",
+                ],
+            )
+
+    with paired_statistics_tab:
+        if comparison_name == "BCF vs ACF":
+            render_bcf_acf_paired_statistics()
+        elif comparison_name == "BF vs AF":
+            render_bf_af_paired_statistics()
+        elif comparison_name == "BCM vs ACM":
+            render_bcm_acm_paired_statistics()
+        elif comparison_name == "BM vs AM":
+            render_bm_am_paired_statistics()
+        else:
+            render_analysis_placeholder(
+                "Paired statistics, effect size, and FDR",
+                comparison_name,
+                "This section will contain pairing-aware hypothesis tests and corrected "
+                "significance results for the analysed EEG features.",
+                [
+                    "Paired statistical test and test statistic",
+                    "Raw p-value and FDR-adjusted p-value",
+                    "Effect size and confidence interval",
+                    "Significant-feature summary",
+                ],
+            )
+
+    with pre_post_visuals_tab:
+        if comparison_name == "BCF vs ACF":
+            render_bcf_acf_pre_post_visualizations()
+        elif comparison_name == "BF vs AF":
+            render_bf_af_pre_post_visualizations()
+        elif comparison_name == "BCM vs ACM":
+            render_bcm_acm_pre_post_visualizations()
+        elif comparison_name == "BM vs AM":
+            render_bm_am_pre_post_visualizations()
+        else:
+            render_analysis_placeholder(
+                "Pre-post visualizations",
+                comparison_name,
+                "This section will visualize the direction, magnitude, and distribution of "
+                "paired feature changes.",
+                [
+                    "Paired line or slope plots",
+                    "Box plots or violin plots",
+                    "Distribution of pre-post change",
+                    "Band-level or feature-level comparison",
+                ],
+            )
+
+    with synthetic_quality_tab:
+        if comparison_name == "BCF vs ACF":
+            render_bcf_acf_synthetic_feature_quality()
+        elif comparison_name == "BF vs AF":
+            render_bf_af_synthetic_feature_quality()
+        elif comparison_name == "BCM vs ACM":
+            render_bcm_acm_synthetic_feature_quality()
+        elif comparison_name == "BM vs AM":
+            render_bm_am_synthetic_feature_quality()
+        else:
+            render_analysis_placeholder(
+                "Synthetic feature quality",
+                comparison_name,
+                "This section will compare descriptive feature properties between real and "
+                "ACGAN-generated samples.",
+                [
+                    "Real-versus-synthetic mean and standard deviation",
+                    "Feature-distribution agreement",
+                    "Feature quality score, when available",
+                    "Features requiring additional review",
+                ],
+            )
+
+    with similarity_tab:
+        if comparison_name == "BCF vs ACF":
+            render_bcf_acf_quantitative_similarity()
+        elif comparison_name == "BF vs AF":
+            render_bf_af_quantitative_similarity()
+        elif comparison_name == "BCM vs ACM":
+            render_bcm_acm_quantitative_similarity()
+        elif comparison_name == "BM vs AM":
+            render_bm_am_quantitative_similarity()
+        else:
+            render_analysis_placeholder(
+                "Quantitative similarity analysis",
+                comparison_name,
+                "This section will report numerical similarity and distance measurements between "
+                "the real and synthetic feature distributions.",
+                [
+                    "Similarity score and correlation",
+                    "Wasserstein distance",
+                    "Kolmogorov-Smirnov statistic",
+                    "MMD or other configured distance metrics",
+                ],
+            )
+
+def render_subject_10_pending_analysis(comparison_name):
+    """Render the complete analysis workspace even when classification output is pending."""
+    render_subject_10_analysis(comparison_name)
+
+
+def find_all_conditions_subject_level_source(candidates):
+    """Return the first available subject-level ZIP from the configured locations."""
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+@st.cache_data
+def load_all_conditions_subject_level():
+    """Load and validate the four cross-condition subject-level ZIP archives."""
+    frames = []
+    missing_archives = []
+
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        source_config = ALL_CONDITIONS_SUBJECT_LEVEL_SOURCES[comparison]
+        archive_path = find_all_conditions_subject_level_source(
+            source_config["candidates"]
+        )
+        if archive_path is None:
+            expected_names = sorted(
+                {path.name for path in source_config["candidates"]}
+            )
+            missing_archives.append(
+                f"{comparison}: {', '.join(expected_names)}"
+            )
+            continue
+
+        with ZipFile(archive_path) as archive:
+            csv_members = sorted(
+                member
+                for member in archive.namelist()
+                if member.lower().endswith(".csv")
+            )
+            if not csv_members:
+                raise ValueError(
+                    f"{archive_path.name} does not contain any CSV files."
+                )
+
+            for member in csv_members:
+                stem_parts = Path(member).stem.split("_")
+                if "SubjectLevel" not in stem_parts:
+                    raise ValueError(
+                        f"Could not infer the frequency band from {member}."
+                    )
+                band_index = stem_parts.index("SubjectLevel") + 1
+                if band_index >= len(stem_parts):
+                    raise ValueError(
+                        f"Could not infer the frequency band from {member}."
+                    )
+                analysis_band = stem_parts[band_index].strip().title()
+
+                with archive.open(member) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+
+                required_columns = {
+                    "subject_id",
+                    "channel",
+                    "feature_type",
+                    "feature",
+                }
+                missing_columns = required_columns.difference(dataframe.columns)
+                if missing_columns:
+                    raise ValueError(
+                        f"{Path(member).name} is missing required columns: "
+                        + ", ".join(sorted(missing_columns))
+                    )
+
+                before_column = (
+                    "Before"
+                    if "Before" in dataframe.columns
+                    else source_config["before"]
+                )
+                after_column = (
+                    "After"
+                    if "After" in dataframe.columns
+                    else source_config["after"]
+                )
+                if before_column not in dataframe.columns or after_column not in dataframe.columns:
+                    raise ValueError(
+                        f"{Path(member).name} does not contain a valid before-after pair."
+                    )
+
+                normalised = dataframe.copy()
+                normalised["Before"] = pd.to_numeric(
+                    normalised[before_column], errors="coerce"
+                )
+                normalised["After"] = pd.to_numeric(
+                    normalised[after_column], errors="coerce"
+                )
+                normalised["Subject"] = pd.to_numeric(
+                    normalised["subject_id"], errors="coerce"
+                )
+                if normalised[["Before", "After", "Subject"]].isna().any().any():
+                    raise ValueError(
+                        f"{Path(member).name} contains missing or non-numeric paired values."
+                    )
+
+                normalised["Comparison"] = comparison
+                normalised["Band"] = analysis_band
+                normalised["Channel"] = (
+                    normalised["channel"].astype(str).str.strip().str.upper()
+                )
+                normalised["Feature_Type"] = (
+                    normalised["feature_type"].astype(str).str.strip().str.upper()
+                )
+                normalised["Feature"] = normalised["feature"].astype(str).str.strip()
+                normalised["Change"] = normalised["After"] - normalised["Before"]
+                normalised["Direction"] = normalised["Change"].apply(
+                    lambda value: (
+                        "Increase"
+                        if value > 0
+                        else "Decrease"
+                        if value < 0
+                        else "No Change"
+                    )
+                )
+                frames.append(
+                    normalised[
+                        [
+                            "Comparison",
+                            "Band",
+                            "Subject",
+                            "Channel",
+                            "Feature_Type",
+                            "Feature",
+                            "Before",
+                            "After",
+                            "Change",
+                            "Direction",
+                        ]
+                    ]
+                )
+
+    if missing_archives:
+        raise FileNotFoundError(
+            "The cross-condition subject-level analysis needs all four ZIP archives. "
+            "Missing archives:\n- " + "\n- ".join(missing_archives)
+        )
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined["Comparison"] = pd.Categorical(
+        combined["Comparison"],
+        categories=ALL_CONDITIONS_COMPARISON_ORDER,
+        ordered=True,
+    )
+    combined["Band"] = pd.Categorical(
+        combined["Band"],
+        categories=ALL_CONDITIONS_BAND_ORDER,
+        ordered=True,
+    )
+
+    duplicate_keys = [
+        "Comparison",
+        "Band",
+        "Subject",
+        "Channel",
+        "Feature",
+    ]
+    if combined.duplicated(duplicate_keys).any():
+        raise ValueError(
+            "Duplicate subject-band-channel-feature rows were found in the ZIP archives."
+        )
+
+    observed_comparisons = set(combined["Comparison"].dropna().astype(str))
+    expected_comparisons = set(ALL_CONDITIONS_COMPARISON_ORDER)
+    if observed_comparisons != expected_comparisons:
+        raise ValueError(
+            "The subject-level ZIP archives do not contain all four comparisons."
+        )
+
+    observed_bands = set(combined["Band"].dropna().astype(str))
+    expected_bands = set(ALL_CONDITIONS_BAND_ORDER)
+    if observed_bands != expected_bands:
+        raise ValueError(
+            "The subject-level ZIP archives do not contain all five frequency bands."
+        )
+
+    subject_sets = [
+        set(group["Subject"].tolist())
+        for _, group in combined.groupby("Comparison", observed=True)
+    ]
+    if not subject_sets or any(subjects != subject_sets[0] for subjects in subject_sets[1:]):
+        raise ValueError(
+            "Subject identifiers are not aligned across the four comparisons."
+        )
+
+    return combined.sort_values(
+        ["Comparison", "Band", "Subject", "Channel", "Feature"]
+    ).reset_index(drop=True)
+
+
+def format_all_conditions_change(value, include_sign=True):
+    """Format raw paired changes while preserving small relative-power values."""
+    if pd.isna(value):
+        return "N/A"
+    sign = "+" if include_sign and value > 0 else ""
+    if abs(value) >= 1000:
+        return f"{sign}{value:,.2f}"
+    if abs(value) >= 1:
+        return f"{sign}{value:,.3f}"
+    return f"{sign}{value:.4f}"
+
+
+def all_conditions_hex_to_rgba(hex_color, alpha):
+    """Convert a six-digit hex colour into a Plotly-compatible RGBA string."""
+    hex_color = hex_color.lstrip("#")
+    red, green, blue = (
+        int(hex_color[index : index + 2], 16) for index in (0, 2, 4)
+    )
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def style_all_conditions_figure(figure, height):
+    """Apply the cross-condition visual style to a Plotly figure."""
+    figure.update_layout(
+        height=height,
+        margin=dict(l=25, r=25, t=95, b=35),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#24313A", size=12),
+        title=dict(x=0.0, xanchor="left", font=dict(size=18, color="#1F2933")),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.03,
+            xanchor="left",
+            x=0,
+            title_text="",
+            font=dict(size=11),
+        ),
+        hoverlabel=dict(bgcolor="#FFFFFF", font_color="#1F2933"),
+    )
+    figure.update_xaxes(
+        showline=True,
+        linecolor="#B8C9C0",
+        gridcolor="#DFE9E3",
+        zeroline=False,
+    )
+    figure.update_yaxes(
+        showline=True,
+        linecolor="#B8C9C0",
+        gridcolor="#DFE9E3",
+        zeroline=False,
+    )
+    return figure
+
+
+def get_all_conditions_overall_finding(dataframe):
+    """Build a data-driven headline from band-specific BP and RP records."""
+    band_specific = dataframe[
+        dataframe["Feature_Type"].isin(["BP", "RP"])
+    ].copy()
+    comparison_summary = (
+        band_specific.groupby("Comparison", observed=True)["Change"]
+        .agg(
+            Records="size",
+            Increases=lambda values: int((values > 0).sum()),
+            Decreases=lambda values: int((values < 0).sum()),
+        )
+        .reset_index()
+    )
+    comparison_summary["Increase_Rate"] = (
+        comparison_summary["Increases"] / comparison_summary["Records"]
+    )
+    comparison_summary["Decrease_Rate"] = (
+        comparison_summary["Decreases"] / comparison_summary["Records"]
+    )
+    upward = comparison_summary.loc[comparison_summary["Increase_Rate"].idxmax()]
+    downward = comparison_summary.loc[comparison_summary["Decrease_Rate"].idxmax()]
+
+    local_summary = (
+        band_specific.groupby(
+            ["Comparison", "Band", "Feature", "Channel"], observed=True
+        )["Change"]
+        .agg(
+            Subjects="size",
+            Increases=lambda values: int((values > 0).sum()),
+            Decreases=lambda values: int((values < 0).sum()),
+        )
+        .reset_index()
+    )
+    strongest_increase = local_summary.sort_values(
+        ["Increases", "Comparison", "Band", "Channel"],
+        ascending=[False, True, True, True],
+    ).iloc[0]
+    strongest_decrease = local_summary.sort_values(
+        ["Decreases", "Comparison", "Band", "Channel"],
+        ascending=[False, True, True, True],
+    ).iloc[0]
+
+    return (
+        f"Across {len(band_specific):,} Band Power and Relative Power paired "
+        f"subject-channel records, **{upward['Comparison']}** had the largest "
+        f"share of increases ({int(upward['Increases'])}/{int(upward['Records'])}, "
+        f"{upward['Increase_Rate']:.1%}), while **{downward['Comparison']}** had "
+        f"the largest share of decreases ({int(downward['Decreases'])}/"
+        f"{int(downward['Records'])}, {downward['Decrease_Rate']:.1%}). The most "
+        f"consistent local patterns reached {int(strongest_increase['Increases'])}/"
+        f"{int(strongest_increase['Subjects'])} increases for "
+        f"{strongest_increase['Feature']} at {strongest_increase['Channel']} "
+        f"({strongest_increase['Comparison']}) and "
+        f"{int(strongest_decrease['Decreases'])}/"
+        f"{int(strongest_decrease['Subjects'])} decreases for "
+        f"{strongest_decrease['Feature']} at {strongest_decrease['Channel']} "
+        f"({strongest_decrease['Comparison']}). These are descriptive patterns; "
+        "statistical significance is assessed separately."
+    )
+
+
+def build_all_conditions_profile_figure(
+    profile, selected_band, selected_feature, selected_channel
+):
+    """Build the cross-condition subject response profile chart."""
+    figure = go.Figure()
+    channel_context = (
+        "mean across TP9, AF7, AF8, and TP10"
+        if selected_channel == "All Channels"
+        else selected_channel
+    )
+
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = profile[profile["Comparison"] == comparison].sort_values(
+            "Subject"
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=comparison_data["Subject_Label"],
+                y=comparison_data["Standardized_Change"],
+                customdata=comparison_data[
+                    ["Before", "After", "Change"]
+                ].to_numpy(),
+                mode="lines+markers",
+                name=comparison,
+                line=dict(
+                    color=ALL_CONDITIONS_COMPARISON_COLORS[comparison],
+                    width=2.6,
+                ),
+                marker=dict(
+                    color=ALL_CONDITIONS_COMPARISON_COLORS[comparison],
+                    size=8,
+                    symbol=ALL_CONDITIONS_COMPARISON_SYMBOLS[comparison],
+                    line=dict(color="#FFFFFF", width=1.2),
+                ),
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>"
+                    "%{x}<br>"
+                    "Standardized change: %{y:+.2f} SD<br>"
+                    "Before: %{customdata[0]:,.4g}<br>"
+                    "After: %{customdata[1]:,.4g}<br>"
+                    "Raw change: %{customdata[2]:+,.4g}<extra></extra>"
+                ),
+            )
+        )
+
+    figure.add_hline(
+        y=0,
+        line_width=1.4,
+        line_dash="dash",
+        line_color="#667085",
+    )
+    figure.update_layout(
+        title=(
+            "<b>Cross-Condition Subject Response Profiles</b><br>"
+            f"<sup>{selected_band} · {selected_feature} · {channel_context}</sup>"
+        ),
+        hovermode="x unified",
+        xaxis_title="Subject",
+        yaxis_title="Standardized paired change (Δ / within-comparison SD)",
+    )
+    return style_all_conditions_figure(figure, 505)
+
+
+def build_all_conditions_direction_figure(profile):
+    """Build a 100% stacked direction-of-change chart."""
+    direction_order = ["Increase", "Decrease", "No Change"]
+    counts = (
+        profile.groupby(["Comparison", "Direction"], observed=True)
+        .size()
+        .reindex(
+            pd.MultiIndex.from_product(
+                [ALL_CONDITIONS_COMPARISON_ORDER, direction_order],
+                names=["Comparison", "Direction"],
+            ),
+            fill_value=0,
+        )
+        .rename("Subjects")
+        .reset_index()
+    )
+    totals = counts.groupby("Comparison")["Subjects"].transform("sum")
+    counts["Share"] = counts["Subjects"] / totals.where(totals > 0, 1)
+
+    figure = go.Figure()
+    for direction in direction_order:
+        direction_data = counts[counts["Direction"] == direction]
+        labels = direction_data.apply(
+            lambda row: (
+                f"{int(row['Subjects'])}/{int(totals.loc[row.name])}"
+                if row["Subjects"] > 0
+                else ""
+            ),
+            axis=1,
+        )
+        figure.add_trace(
+            go.Bar(
+                y=direction_data["Comparison"],
+                x=direction_data["Share"],
+                orientation="h",
+                name=direction,
+                marker_color=ALL_CONDITIONS_DIRECTION_COLORS[direction],
+                text=labels,
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(
+                    color="#FFFFFF" if direction == "Increase" else "#26352D"
+                ),
+                customdata=direction_data["Subjects"],
+                hovertemplate=(
+                    f"<b>{direction}</b><br>"
+                    "%{y}<br>Subjects: %{customdata}<br>Share: %{x:.0%}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+    figure.update_layout(
+        barmode="stack",
+        title=(
+            "<b>Direction Balance by Comparison</b><br>"
+            "<sup>Direction is calculated after the selected channel aggregation</sup>"
+        ),
+        xaxis_title="Paired subjects (%)",
+        yaxis_title="",
+        xaxis=dict(range=[0, 1], tickformat=".0%"),
+        yaxis=dict(
+            categoryorder="array",
+            categoryarray=list(reversed(ALL_CONDITIONS_COMPARISON_ORDER)),
+        ),
+    )
+    return style_all_conditions_figure(figure, 410)
+
+
+def build_all_conditions_distribution_figure(profile):
+    """Build a compact real-data distribution comparison for the selected view."""
+    figure = go.Figure()
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = profile[profile["Comparison"] == comparison]
+        color = ALL_CONDITIONS_COMPARISON_COLORS[comparison]
+        figure.add_trace(
+            go.Box(
+                x=[comparison] * len(comparison_data),
+                y=comparison_data["Standardized_Change"],
+                name=comparison,
+                boxpoints="all",
+                jitter=0.28,
+                pointpos=0,
+                boxmean=True,
+                fillcolor=all_conditions_hex_to_rgba(color, 0.17),
+                line=dict(color=color, width=2),
+                marker=dict(color=color, size=6, opacity=0.78),
+                customdata=comparison_data["Change"],
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>"
+                    "Standardized change: %{y:+.2f} SD<br>"
+                    "Raw change: %{customdata:+,.4g}<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+
+    figure.add_hline(
+        y=0,
+        line_width=1.2,
+        line_dash="dash",
+        line_color="#667085",
+    )
+    figure.update_layout(
+        title=(
+            "<b>Response Distribution</b><br>"
+            "<sup>Dots preserve every subject-level paired change</sup>"
+        ),
+        xaxis_title="",
+        yaxis_title="Standardized paired change",
+        showlegend=False,
+    )
+    return style_all_conditions_figure(figure, 410)
+
+
+def render_all_conditions_subject_level_summary():
+    """Render the completed subject-level comparison across all four conditions."""
+    st.subheader("Subject-level summary across conditions")
+    st.caption(
+        "Compare paired response magnitude and direction for the same 10 subjects "
+        "across BCF-ACF, BF-AF, BCM-ACM, and BM-AM."
+    )
+
+    try:
+        dataframe = load_all_conditions_subject_level()
+    except (FileNotFoundError, ValueError, BadZipFile, pd.errors.ParserError) as error:
+        st.error(str(error))
+        st.info(
+            "Keep the four subject_level_master ZIP archives beside app.py or "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** " + get_all_conditions_overall_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns([0.85, 1.35, 0.9])
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            ALL_CONDITIONS_BAND_ORDER,
+            index=0,
+            key="all_conditions_subject_band",
+        )
+
+    band_data = dataframe[dataframe["Band"] == selected_band].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    with filter_2:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="all_conditions_subject_feature",
+        )
+    with filter_3:
+        selected_channel = st.selectbox(
+            "Channel",
+            ["All Channels"] + ALL_CONDITIONS_CHANNEL_ORDER,
+            index=0,
+            key="all_conditions_subject_channel",
+        )
+
+    selected = band_data[band_data["Feature"] == selected_feature].copy()
+    if selected_channel != "All Channels":
+        selected = selected[selected["Channel"] == selected_channel]
+
+    profile = (
+        selected.groupby(["Comparison", "Subject"], observed=True, as_index=False)
+        .agg(
+            Before=("Before", "mean"),
+            After=("After", "mean"),
+            Change=("Change", "mean"),
+            Channels=("Channel", "nunique"),
+        )
+    )
+    if profile.empty:
+        st.warning("No subject-level records match the selected filters.")
+        return
+
+    profile["Direction"] = profile["Change"].apply(
+        lambda value: (
+            "Increase" if value > 0 else "Decrease" if value < 0 else "No Change"
+        )
+    )
+    scale = profile.groupby("Comparison", observed=True)["Change"].transform("std")
+    scale = scale.where(scale.abs() > 0, 1.0).fillna(1.0)
+    profile["Standardized_Change"] = profile["Change"] / scale
+    profile["Subject_Label"] = profile["Subject"].map(
+        lambda value: (
+            f"Subject {int(value)}" if float(value).is_integer() else f"Subject {value}"
+        )
+    )
+    profile["Comparison"] = pd.Categorical(
+        profile["Comparison"],
+        categories=ALL_CONDITIONS_COMPARISON_ORDER,
+        ordered=True,
+    )
+    profile = profile.sort_values(["Comparison", "Subject"])
+
+    selection_summary = (
+        profile.groupby("Comparison", observed=True)["Change"]
+        .agg(
+            Subjects="size",
+            Mean_Change="mean",
+            Median_Change="median",
+            Increases=lambda values: int((values > 0).sum()),
+            Decreases=lambda values: int((values < 0).sum()),
+            No_Change=lambda values: int((values == 0).sum()),
+        )
+        .reset_index()
+    )
+    selection_summary["Dominant_Count"] = selection_summary[
+        ["Increases", "Decreases", "No_Change"]
+    ].max(axis=1)
+    selection_summary["Dominant_Direction"] = selection_summary[
+        ["Increases", "Decreases", "No_Change"]
+    ].idxmax(axis=1).replace(
+        {
+            "Increases": "increased",
+            "Decreases": "decreased",
+            "No_Change": "showed no change",
+        }
+    )
+    selection_summary["Absolute_Median"] = selection_summary["Median_Change"].abs()
+    strongest_direction = selection_summary.sort_values(
+        ["Dominant_Count", "Absolute_Median"], ascending=[False, False]
+    ).iloc[0]
+    largest_median = selection_summary.loc[
+        selection_summary["Absolute_Median"].idxmax()
+    ]
+
+    channel_context = (
+        "averaged across the four channels"
+        if selected_channel == "All Channels"
+        else f"at {selected_channel}"
+    )
+    st.info(
+        f"**Selected-view finding.** For {selected_band} · {selected_feature} "
+        f"{channel_context}, **{strongest_direction['Comparison']}** showed the "
+        f"clearest direction: {int(strongest_direction['Dominant_Count'])} of "
+        f"{int(strongest_direction['Subjects'])} subjects "
+        f"{strongest_direction['Dominant_Direction']}. The largest absolute "
+        f"median paired change occurred in **{largest_median['Comparison']}** "
+        f"({format_all_conditions_change(largest_median['Median_Change'])})."
+    )
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Paired Subjects", int(profile["Subject"].nunique()))
+    metric_2.metric("Comparisons", int(profile["Comparison"].nunique()))
+    with metric_3:
+        st.metric(
+            "Strongest Direction",
+            f"{int(strongest_direction['Dominant_Count'])} / "
+            f"{int(strongest_direction['Subjects'])}",
+        )
+        st.caption(str(strongest_direction["Comparison"]))
+    with metric_4:
+        st.metric(
+            "Largest Median Δ",
+            format_all_conditions_change(largest_median["Median_Change"]),
+        )
+        st.caption(str(largest_median["Comparison"]))
+
+    profile_figure = build_all_conditions_profile_figure(
+        profile,
+        selected_band,
+        selected_feature,
+        selected_channel,
+    )
+    st.plotly_chart(
+        profile_figure,
+        use_container_width=True,
+        key="all_conditions_subject_profile",
+    )
+    st.caption(
+        "Each coloured line follows one comparison across the same subject IDs. "
+        "Values are divided by the within-comparison SD (without mean-centring) "
+        "so differently scaled condition pairs can share one readable axis; hover "
+        "to inspect the raw before, after, and change values."
+    )
+
+    chart_1, chart_2 = st.columns([1.08, 0.92])
+    with chart_1:
+        st.plotly_chart(
+            build_all_conditions_direction_figure(profile),
+            use_container_width=True,
+            key="all_conditions_direction_balance",
+        )
+    with chart_2:
+        st.plotly_chart(
+            build_all_conditions_distribution_figure(profile),
+            use_container_width=True,
+            key="all_conditions_response_distribution",
+        )
+
+    with st.expander("View selected comparison summary", expanded=False):
+        summary_display = selection_summary[
+            [
+                "Comparison",
+                "Subjects",
+                "Mean_Change",
+                "Median_Change",
+                "Increases",
+                "Decreases",
+                "No_Change",
+            ]
+        ].copy()
+        summary_display["Mean Change"] = summary_display.pop("Mean_Change").map(
+            format_all_conditions_change
+        )
+        summary_display["Median Change"] = summary_display.pop("Median_Change").map(
+            format_all_conditions_change
+        )
+        summary_display = summary_display.rename(
+            columns={
+                "No_Change": "No Change",
+                "Increases": "Increased",
+                "Decreases": "Decreased",
+            }
+        )
+        st.dataframe(summary_display, use_container_width=True, hide_index=True)
+
+    with st.expander("Cross-condition interpretation notes", expanded=False):
+        st.markdown(
+            """
+- Change is recalculated as after minus before for every paired observation.
+- When **All Channels** is selected, the four channel changes are averaged within each subject before direction is assigned.
+- The profile and distribution charts divide raw change by the within-comparison subject SD without subtracting the mean. This preserves zero and direction while preventing one condition's scale from dominating the visual.
+- Band Power and Relative Power are band-specific. Entropy and Hjorth features are broadband values repeated in each band archive, so they should be interpreted once per selected band rather than pooled across bands.
+- Direction counts and median changes are descriptive. Use the **Paired Statistics & FDR** tab for inferential results.
+            """
+        )
+
+
+@st.cache_data
+def load_all_conditions_paired_statistics():
+    """Load and validate paired-statistics tables for all four comparisons."""
+    frames = []
+    missing_sources = []
+    numeric_columns = [
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "t_statistic",
+        "p_ttest",
+        "wilcoxon_statistic",
+        "p_wilcoxon",
+        "p_fdr_ttest",
+        "p_fdr_wilcoxon",
+    ]
+    required_numeric = [
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "p_ttest",
+        "p_wilcoxon",
+        "p_fdr_ttest",
+        "p_fdr_wilcoxon",
+    ]
+
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        source_config = ALL_CONDITIONS_PAIRED_STATISTICS_SOURCES[comparison]
+        source_path = next(
+            (
+                path
+                for path in source_config["candidates"]
+                if path.exists()
+            ),
+            None,
+        )
+        if source_path is None:
+            missing_sources.append(comparison)
+            continue
+
+        comparison_frames = []
+        with ZipFile(source_path) as archive:
+            csv_names = [
+                name
+                for name in archive.namelist()
+                if name.lower().endswith(".csv")
+                and "pairedstatistics_effectsize_fdr" in name.lower()
+                and source_config["pair_token"] in Path(name).stem.lower()
+            ]
+            for csv_name in csv_names:
+                band = get_bcf_acf_paired_band_from_name(csv_name)
+                if band is None:
+                    continue
+                with archive.open(csv_name) as csv_file:
+                    dataframe = pd.read_csv(csv_file)
+                dataframe.insert(0, "Comparison", comparison)
+                dataframe.insert(1, "Analysis_Band", band)
+                dataframe["Source_File"] = Path(csv_name).name
+                comparison_frames.append(dataframe)
+
+        observed_bands = {
+            frame["Analysis_Band"].iloc[0] for frame in comparison_frames
+        }
+        missing_bands = [
+            band
+            for band in ALL_CONDITIONS_BAND_ORDER
+            if band not in observed_bands
+        ]
+        if missing_bands:
+            raise ValueError(
+                f"The {comparison} paired-statistics archive is incomplete. "
+                "Missing bands: " + ", ".join(missing_bands)
+            )
+
+        for dataframe in comparison_frames:
+            dataframe = dataframe.copy()
+            for optional_column in ["t_statistic", "wilcoxon_statistic"]:
+                if optional_column not in dataframe.columns:
+                    dataframe[optional_column] = pd.NA
+
+            missing_columns = BCF_ACF_PAIRED_REQUIRED_COLUMNS.difference(
+                dataframe.columns
+            )
+            if missing_columns:
+                raise ValueError(
+                    f"{dataframe['Source_File'].iloc[0]} is missing required "
+                    "columns: " + ", ".join(sorted(missing_columns))
+                )
+
+            dataframe["Analysis_Band"] = (
+                dataframe["Analysis_Band"].astype(str).str.strip().str.title()
+            )
+            dataframe["channel"] = (
+                dataframe["channel"].astype(str).str.strip().str.upper()
+            )
+            dataframe["feature"] = (
+                dataframe["feature"].astype(str).str.strip()
+            )
+            dataframe["feature_type"] = (
+                dataframe["feature_type"].astype(str).str.strip().str.upper()
+            )
+            dataframe["effect_size_interpretation"] = (
+                dataframe["effect_size_interpretation"]
+                .astype(str)
+                .str.strip()
+                .str.title()
+            )
+
+            for column in numeric_columns:
+                dataframe[column] = pd.to_numeric(
+                    dataframe[column], errors="coerce"
+                )
+
+            if dataframe[required_numeric].isna().any().any():
+                raise ValueError(
+                    f"{dataframe['Source_File'].iloc[0]} contains missing or "
+                    "non-numeric values in required statistical columns."
+                )
+            if (dataframe["ci95_lower"] > dataframe["ci95_upper"]).any():
+                raise ValueError(
+                    f"{dataframe['Source_File'].iloc[0]} contains an invalid "
+                    "95% confidence interval."
+                )
+            for probability_column in [
+                "p_ttest",
+                "p_wilcoxon",
+                "p_fdr_ttest",
+                "p_fdr_wilcoxon",
+            ]:
+                if not dataframe[probability_column].between(0, 1).all():
+                    raise ValueError(
+                        f"{dataframe['Source_File'].iloc[0]} contains "
+                        f"{probability_column} values outside 0-1."
+                    )
+            frames.append(dataframe)
+
+    if missing_sources:
+        raise FileNotFoundError(
+            "Paired-statistics ZIP archives were not found for: "
+            + ", ".join(missing_sources)
+            + ". Keep all four archives beside app.py or inside data/ or "
+            "assets/data/."
+        )
+    if not frames:
+        raise FileNotFoundError(
+            "No cross-condition paired-statistics CSV files were found."
+        )
+
+    master = pd.concat(frames, ignore_index=True)
+    duplicate_rows = master.duplicated(
+        ["Comparison", "Analysis_Band", "channel", "feature"], keep=False
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate comparison-band-channel-feature rows were found in "
+            "the paired-statistics archives."
+        )
+
+    expected_rows = pd.MultiIndex.from_product(
+        [ALL_CONDITIONS_COMPARISON_ORDER, ALL_CONDITIONS_BAND_ORDER],
+        names=["Comparison", "Analysis_Band"],
+    )
+    rows_per_family = (
+        master.groupby(["Comparison", "Analysis_Band"], observed=True)
+        .size()
+        .reindex(expected_rows, fill_value=0)
+    )
+    incomplete_families = rows_per_family[rows_per_family != 24]
+    if not incomplete_families.empty:
+        details = ", ".join(
+            f"{comparison} / {band}: {count}"
+            for (comparison, band), count in incomplete_families.items()
+        )
+        raise ValueError(
+            "Each comparison-band FDR family must contain 24 tests. Found "
+            + details
+        )
+
+    master["Comparison"] = pd.Categorical(
+        master["Comparison"],
+        categories=ALL_CONDITIONS_COMPARISON_ORDER,
+        ordered=True,
+    )
+    master["Analysis_Band"] = pd.Categorical(
+        master["Analysis_Band"],
+        categories=ALL_CONDITIONS_BAND_ORDER,
+        ordered=True,
+    )
+    return master.sort_values(
+        ["Comparison", "Analysis_Band", "channel", "feature"]
+    ).reset_index(drop=True)
+
+
+def get_all_conditions_paired_key_finding(dataframe):
+    """Build a cross-condition finding without pooling or averaging p-values."""
+    t_nominal = int((dataframe["p_ttest"] < 0.05).sum())
+    w_nominal = int((dataframe["p_wilcoxon"] < 0.05).sum())
+    t_fdr = int((dataframe["p_fdr_ttest"] < 0.05).sum())
+    w_fdr = int((dataframe["p_fdr_wilcoxon"] < 0.05).sum())
+    strongest = dataframe.loc[dataframe["cohens_dz"].abs().idxmax()]
+
+    minimum_q_candidates = [
+        (
+            "paired t-test",
+            "p_fdr_ttest",
+            float(dataframe["p_fdr_ttest"].min()),
+        ),
+        (
+            "Wilcoxon signed-rank test",
+            "p_fdr_wilcoxon",
+            float(dataframe["p_fdr_wilcoxon"].min()),
+        ),
+    ]
+    minimum_test, minimum_column, minimum_q = min(
+        minimum_q_candidates, key=lambda item: item[2]
+    )
+    minimum_row = dataframe.loc[dataframe[minimum_column].idxmin()]
+
+    broadband_note = ""
+    if strongest["feature_type"] not in {"BP", "RP"}:
+        broadband_note = (
+            " This is a broadband feature repeated in the five band archives, "
+            "so it represents one recurring comparison rather than five "
+            "independent findings."
+        )
+
+    return (
+        f"Across the 20 supplied comparison-band files "
+        f"({len(dataframe):,} row-level tests), {t_nominal} paired t-test and "
+        f"{w_nominal} Wilcoxon raw p-values were below 0.05. After the "
+        f"file-specific FDR corrections, {t_fdr} t-test and {w_fdr} Wilcoxon "
+        "results remained significant. The largest absolute effect was "
+        f"{strongest['feature']} at {strongest['channel']} for "
+        f"{strongest['Comparison']} (Cohen's dz = "
+        f"{strongest['cohens_dz']:+.3f}).{broadband_note} The smallest "
+        f"adjusted value was q = {minimum_q:.4f} from the {minimum_test} for "
+        f"{minimum_row['feature']} at {minimum_row['channel']} "
+        f"({minimum_row['Comparison']}, "
+        f"{minimum_row['Analysis_Band']} file), which is still above 0.05."
+    )
+
+
+def build_all_conditions_paired_effect_figure(
+    selected_data, selected_band, selected_feature, test_label, p_column, q_column
+):
+    """Build four compact diverging bar panels on one shared dz scale."""
+    subplot_positions = {
+        "BCF vs ACF": (1, 1),
+        "BF vs AF": (1, 2),
+        "BCM vs ACM": (2, 1),
+        "BM vs AM": (2, 2),
+    }
+    figure = make_subplots(
+        rows=2,
+        cols=2,
+        shared_xaxes=True,
+        horizontal_spacing=0.11,
+        vertical_spacing=0.20,
+        subplot_titles=[
+            f"<b>{comparison}</b>"
+            for comparison in ALL_CONDITIONS_COMPARISON_ORDER
+        ],
+    )
+    channel_order = list(reversed(ALL_CONDITIONS_CHANNEL_ORDER))
+    maximum_effect = max(
+        1.0, float(selected_data["cohens_dz"].abs().max()) * 1.32
+    )
+
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        row, column = subplot_positions[comparison]
+        comparison_data = selected_data[
+            selected_data["Comparison"].astype(str) == comparison
+        ].copy()
+        comparison_data = (
+            comparison_data.set_index("channel")
+            .reindex(channel_order)
+            .reset_index()
+        )
+        figure.add_trace(
+            go.Bar(
+                x=comparison_data["cohens_dz"],
+                y=comparison_data["channel"],
+                customdata=comparison_data[
+                    [
+                        "mean_change",
+                        "ci95_lower",
+                        "ci95_upper",
+                        p_column,
+                        q_column,
+                        "effect_size_interpretation",
+                    ]
+                ].to_numpy(),
+                orientation="h",
+                name=comparison,
+                marker=dict(
+                    color=ALL_CONDITIONS_COMPARISON_COLORS[comparison],
+                    line=dict(color="#FFFFFF", width=1.0),
+                ),
+                width=0.52,
+                text=comparison_data["cohens_dz"].map(
+                    lambda value: f"{value:+.2f}"
+                ),
+                textposition="outside",
+                textfont=dict(color="#24313A", size=12),
+                cliponaxis=False,
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>"
+                    "Channel: %{y}<br>"
+                    "Cohen's dz: %{x:+.3f}<br>"
+                    "Effect: %{customdata[5]}<br>"
+                    "Mean change: %{customdata[0]:+,.4g}<br>"
+                    "95% CI for mean change: [%{customdata[1]:,.4g}, "
+                    "%{customdata[2]:,.4g}]<br>"
+                    "Raw p: %{customdata[3]:.4f}<br>"
+                    "FDR q: %{customdata[4]:.4f}<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            row=row,
+            col=column,
+        )
+
+        # The pale centre band makes negligible effects immediately visible.
+        figure.add_vrect(
+            x0=-0.2,
+            x1=0.2,
+            fillcolor="rgba(109, 127, 117, 0.10)",
+            line_width=0,
+            layer="below",
+            row=row,
+            col=column,
+        )
+        figure.add_vline(
+            x=0,
+            line_width=1.8,
+            line_color="#52635A",
+            row=row,
+            col=column,
+        )
+        for threshold in [-0.8, -0.5, 0.5, 0.8]:
+            figure.add_vline(
+                x=threshold,
+                line_width=1,
+                line_dash="dot",
+                line_color="#D2DDD7",
+                row=row,
+                col=column,
+            )
+
+        figure.update_xaxes(
+            range=[-maximum_effect, maximum_effect],
+            tickformat=".1f",
+            zeroline=False,
+            row=row,
+            col=column,
+        )
+        figure.update_yaxes(
+            categoryorder="array",
+            categoryarray=channel_order,
+            showgrid=False,
+            row=row,
+            col=column,
+        )
+
+    figure.update_layout(
+        title=(
+            "<b>Effect Size by Comparison and EEG Channel</b><br>"
+            f"<sup>{selected_band} · {selected_feature} · {test_label} · "
+            "shared Cohen's dz scale</sup>"
+        ),
+        showlegend=False,
+        bargap=0.30,
+        margin=dict(l=35, r=35, t=115, b=75),
+        hoverlabel=dict(
+            bgcolor="#FFFFFF",
+            bordercolor="#D6E2DB",
+            font_color="#24313A",
+        ),
+        hovermode="closest",
+    )
+    figure.add_annotation(
+        x=0.0,
+        y=-0.13,
+        xref="paper",
+        yref="paper",
+        text="← Lower after",
+        showarrow=False,
+        xanchor="left",
+        font=dict(size=12, color="#667085"),
+    )
+    figure.add_annotation(
+        x=1.0,
+        y=-0.13,
+        xref="paper",
+        yref="paper",
+        text="Higher after →",
+        showarrow=False,
+        xanchor="right",
+        font=dict(size=12, color="#667085"),
+    )
+    figure = style_all_conditions_figure(figure, 665)
+    figure.update_layout(margin=dict(l=35, r=35, t=115, b=75))
+    return figure
+
+
+def build_all_conditions_paired_fdr_heatmap(
+    selected_data, selected_band, selected_feature, test_label, q_column
+):
+    """Build a comparison-by-channel heatmap of source FDR q-values."""
+    matrix = (
+        selected_data.pivot(
+            index="Comparison", columns="channel", values=q_column
+        )
+        .reindex(
+            index=ALL_CONDITIONS_COMPARISON_ORDER,
+            columns=ALL_CONDITIONS_CHANNEL_ORDER,
+        )
+    )
+    figure = go.Figure(
+        go.Heatmap(
+            z=matrix.values,
+            x=matrix.columns.tolist(),
+            y=matrix.index.astype(str).tolist(),
+            zmin=0,
+            zmax=1,
+            colorscale=[
+                [0.00, "#1F6B35"],
+                [0.05, "#5BAE7A"],
+                [0.25, "#CFE8D8"],
+                [1.00, "#F2F5F3"],
+            ],
+            colorbar=dict(title="FDR q", thickness=14),
+            hovertemplate=(
+                "Comparison: %{y}<br>Channel: %{x}<br>"
+                "FDR q: %{z:.4f}<extra></extra>"
+            ),
+        )
+    )
+
+    for comparison in matrix.index:
+        for channel in matrix.columns:
+            value = matrix.loc[comparison, channel]
+            if pd.isna(value):
+                label = "N/A"
+            else:
+                label = f"{value:.3f}" + ("*" if value < 0.05 else "")
+            figure.add_annotation(
+                x=channel,
+                y=str(comparison),
+                text=label,
+                showarrow=False,
+                font=dict(size=12, color="#20312A"),
+            )
+
+    figure.update_layout(
+        title=(
+            "<b>FDR Evidence Map</b><br>"
+            f"<sup>{selected_band} · {selected_feature} · lower q is stronger</sup>"
+        ),
+        xaxis_title="EEG Channel",
+        yaxis_title="",
+        yaxis_autorange="reversed",
+    )
+    return style_all_conditions_figure(figure, 420)
+
+
+def build_all_conditions_paired_outcome_figure(
+    band_data, selected_band, test_label, p_column, q_column
+):
+    """Build a stacked count chart of nominal and FDR outcomes."""
+    records = []
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = band_data[
+            band_data["Comparison"].astype(str) == comparison
+        ]
+        fdr_significant = int((comparison_data[q_column] < 0.05).sum())
+        nominal_only = int(
+            (
+                (comparison_data[p_column] < 0.05)
+                & (comparison_data[q_column] >= 0.05)
+            ).sum()
+        )
+        not_nominal = int((comparison_data[p_column] >= 0.05).sum())
+        records.append(
+            {
+                "Comparison": comparison,
+                "FDR significant": fdr_significant,
+                "Nominal only": nominal_only,
+                "p ≥ 0.05": not_nominal,
+                "Total": len(comparison_data),
+            }
+        )
+    outcome_data = pd.DataFrame(records)
+    outcome_colors = {
+        "FDR significant": "#237A57",
+        "Nominal only": "#FF8A65",
+        "p ≥ 0.05": "#D7E2DC",
+    }
+
+    figure = go.Figure()
+    for outcome in ["FDR significant", "Nominal only", "p ≥ 0.05"]:
+        counts = outcome_data[outcome]
+        shares = counts / outcome_data["Total"].where(
+            outcome_data["Total"] > 0, 1
+        )
+        figure.add_trace(
+            go.Bar(
+                y=outcome_data["Comparison"],
+                x=counts,
+                orientation="h",
+                name=outcome,
+                marker_color=outcome_colors[outcome],
+                text=counts.map(lambda value: str(value) if value else ""),
+                textposition="inside",
+                insidetextanchor="middle",
+                customdata=shares,
+                hovertemplate=(
+                    f"<b>{outcome}</b><br>"
+                    "%{y}: %{x} tests (%{customdata:.1%})<extra></extra>"
+                ),
+            )
+        )
+
+    figure.update_layout(
+        title=(
+            "<b>Test Outcomes by Comparison</b><br>"
+            f"<sup>{selected_band} · all 24 tests per comparison · {test_label}</sup>"
+        ),
+        barmode="stack",
+        xaxis_title="Number of channel-feature tests",
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=list(reversed(ALL_CONDITIONS_COMPARISON_ORDER)),
+        ),
+    )
+    return style_all_conditions_figure(figure, 420)
+
+
+def prepare_all_conditions_paired_display_table(
+    band_data, p_column, q_column
+):
+    """Prepare the smallest-q cross-condition results for dashboard display."""
+    table = band_data.sort_values([q_column, p_column, "Comparison"]).head(12)
+    table = table[
+        [
+            "Comparison",
+            "channel",
+            "feature",
+            "mean_change",
+            "ci95_lower",
+            "ci95_upper",
+            "cohens_dz",
+            "effect_size_interpretation",
+            p_column,
+            q_column,
+        ]
+    ].copy()
+    table["Mean Change"] = table["mean_change"].map(
+        format_all_conditions_change
+    )
+    table["95% CI for Mean Change"] = table.apply(
+        lambda row: (
+            f"[{row['ci95_lower']:.4g}, {row['ci95_upper']:.4g}]"
+            if pd.notna(row["ci95_lower"]) and pd.notna(row["ci95_upper"])
+            else "N/A"
+        ),
+        axis=1,
+    )
+    table["Cohen's dz"] = table["cohens_dz"].round(3)
+    table["Raw p"] = table[p_column].map(format_bcf_acf_p_value)
+    table["FDR q"] = table[q_column].map(format_bcf_acf_p_value)
+    table["FDR Significant"] = table[q_column].map(
+        lambda value: "Yes" if value < 0.05 else "No"
+    )
+    table = table.rename(
+        columns={
+            "channel": "Channel",
+            "feature": "Feature",
+            "effect_size_interpretation": "Effect",
+        }
+    )
+    return table[
+        [
+            "Comparison",
+            "Channel",
+            "Feature",
+            "Mean Change",
+            "95% CI for Mean Change",
+            "Cohen's dz",
+            "Effect",
+            "Raw p",
+            "FDR q",
+            "FDR Significant",
+        ]
+    ]
+
+
+def render_all_conditions_paired_statistics():
+    """Render paired statistics and FDR results across all conditions."""
+    st.subheader("Paired statistics and FDR across conditions")
+    st.caption(
+        "Compare effect sizes, mean-change confidence intervals, raw p-values, "
+        "and source FDR q-values across BCF-ACF, BF-AF, BCM-ACM, and BM-AM."
+    )
+
+    try:
+        dataframe = load_all_conditions_paired_statistics()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        BadZipFile,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep the four paired_statistics_master ZIP archives beside app.py "
+            "or inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_all_conditions_paired_key_finding(dataframe)
+        + " Nominal results are shown as screening signals, not confirmed "
+        "findings."
+    )
+
+    filter_1, filter_2, filter_3 = st.columns([0.8, 1.05, 1.35])
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            ALL_CONDITIONS_BAND_ORDER,
+            index=0,
+            key="all_conditions_paired_band",
+        )
+    with filter_2:
+        selected_test = st.selectbox(
+            "Statistical test",
+            list(BCF_ACF_TEST_OPTIONS),
+            index=0,
+            key="all_conditions_paired_test",
+        )
+
+    band_data = dataframe[
+        dataframe["Analysis_Band"].astype(str) == selected_band
+    ].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    with filter_3:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="all_conditions_paired_feature",
+        )
+
+    test_config = BCF_ACF_TEST_OPTIONS[selected_test]
+    p_column = test_config["p_column"]
+    q_column = test_config["q_column"]
+    selected_data = band_data[
+        band_data["feature"] == selected_feature
+    ].copy()
+    if selected_data.empty:
+        st.warning("No paired-statistics rows match the selected filters.")
+        return
+
+    nominal_count = int((selected_data[p_column] < 0.05).sum())
+    fdr_count = int((selected_data[q_column] < 0.05).sum())
+    strongest = selected_data.loc[selected_data["cohens_dz"].abs().idxmax()]
+    smallest_q = selected_data.loc[selected_data[q_column].idxmin()]
+
+    st.info(
+        f"**Selected-view finding.** For {selected_band} · "
+        f"{selected_feature}, the {selected_test} identified "
+        f"{nominal_count} of {len(selected_data)} raw p-values below 0.05 and "
+        f"{fdr_count} results after FDR correction. The largest effect was "
+        f"{strongest['Comparison']} at {strongest['channel']} "
+        f"(Cohen's dz = {strongest['cohens_dz']:+.3f}); the smallest adjusted "
+        f"value was q = {smallest_q[q_column]:.4f} for "
+        f"{smallest_q['Comparison']} at {smallest_q['channel']}."
+    )
+
+    metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
+    metric_1.metric("Tests in View", len(selected_data))
+    metric_2.metric(
+        "Nominal p < 0.05", f"{nominal_count} / {len(selected_data)}"
+    )
+    metric_3.metric(
+        "Significant After FDR", f"{fdr_count} / {len(selected_data)}"
+    )
+    metric_4.metric(
+        "Largest |Cohen's dz|", f"{abs(strongest['cohens_dz']):.3f}"
+    )
+    metric_5.metric(
+        "Smallest FDR q", format_bcf_acf_p_value(smallest_q[q_column])
+    )
+
+    st.plotly_chart(
+        build_all_conditions_paired_effect_figure(
+            selected_data,
+            selected_band,
+            selected_feature,
+            selected_test,
+            p_column,
+            q_column,
+        ),
+        use_container_width=True,
+        key="all_conditions_paired_effect_profile",
+    )
+    st.caption(
+        "Each mini-panel uses the same Cohen's dz scale: bars extending left "
+        "indicate lower values after the condition, while bars extending right "
+        "indicate higher values. The pale centre band marks |dz| < 0.2; dotted "
+        "guides mark 0.5 and 0.8. Hover confidence intervals apply to mean "
+        "change—not Cohen's dz—because effect-size confidence intervals were "
+        "not supplied."
+    )
+
+    chart_1, chart_2 = st.columns([1.02, 0.98])
+    with chart_1:
+        st.plotly_chart(
+            build_all_conditions_paired_fdr_heatmap(
+                selected_data,
+                selected_band,
+                selected_feature,
+                selected_test,
+                q_column,
+            ),
+            use_container_width=True,
+            key="all_conditions_paired_fdr_heatmap",
+        )
+    with chart_2:
+        st.plotly_chart(
+            build_all_conditions_paired_outcome_figure(
+                band_data,
+                selected_band,
+                selected_test,
+                p_column,
+                q_column,
+            ),
+            use_container_width=True,
+            key="all_conditions_paired_outcome_counts",
+        )
+
+    st.caption(
+        "The heatmap reports the selected feature's source q-values; an "
+        "asterisk marks q < 0.05. The stacked bars summarize all 24 tests in "
+        "each comparison-band correction family without pooling p-values."
+    )
+
+    st.markdown("#### Results with the smallest FDR-adjusted p-values")
+    st.dataframe(
+        prepare_all_conditions_paired_display_table(
+            band_data, p_column, q_column
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    download_columns = [
+        "Comparison",
+        "Analysis_Band",
+        "channel",
+        "feature",
+        "n_subjects",
+        "mean_change",
+        "ci95_lower",
+        "ci95_upper",
+        "cohens_dz",
+        "effect_size_interpretation",
+        p_column,
+        q_column,
+    ]
+    st.download_button(
+        "Download selected-band paired statistics",
+        data=band_data[download_columns].to_csv(index=False).encode("utf-8"),
+        file_name=(
+            "all_conditions_paired_statistics_"
+            + selected_band.lower()
+            + ".csv"
+        ),
+        mime="text/csv",
+        key="all_conditions_paired_download",
+    )
+
+    with st.expander("Statistical interpretation notes", expanded=False):
+        st.markdown(
+            """
+- Each point represents a paired analysis of 10 subjects. Positive Cohen's dz means the after-condition value is higher; negative dz means it is lower.
+- FDR q-values are read directly from each comparison-band file. Each file is a separate family of 24 channel-feature tests; p-values and q-values are never averaged across comparisons or bands.
+- A raw p-value below 0.05 with q ≥ 0.05 is labelled **Nominal only** and is not treated as a multiplicity-adjusted finding.
+- The supplied confidence interval is for the mean paired change. The files do not provide a confidence interval for Cohen's dz, so the effect-size profile intentionally uses point estimates.
+- Entropy and Hjorth measures are broadband rows repeated in every band archive. Interpret a selected broadband result once; do not count its recurrence across five files as five independent biological effects.
+- These results are exploratory and descriptive of this 10-subject sample; they do not establish clinical efficacy or causality.
+            """
+        )
+
+
+def get_all_conditions_pre_post_key_finding(dataframe):
+    """Create a global pre-post finding from band-specific BP and RP rows."""
+    band_specific = dataframe[
+        dataframe["Feature_Type"].isin(["BP", "RP"])
+    ].copy()
+    comparison_summary = (
+        band_specific.groupby("Comparison", observed=True)["Change"]
+        .agg(
+            Records="size",
+            Increases=lambda values: int((values > 0).sum()),
+            Decreases=lambda values: int((values < 0).sum()),
+        )
+        .reset_index()
+    )
+    comparison_summary["Increase_Rate"] = (
+        comparison_summary["Increases"] / comparison_summary["Records"]
+    )
+    comparison_summary["Decrease_Rate"] = (
+        comparison_summary["Decreases"] / comparison_summary["Records"]
+    )
+    upward = comparison_summary.loc[
+        comparison_summary["Increase_Rate"].idxmax()
+    ]
+    downward = comparison_summary.loc[
+        comparison_summary["Decrease_Rate"].idxmax()
+    ]
+
+    local_summary = (
+        band_specific.groupby(
+            ["Comparison", "Band", "Feature", "Channel"],
+            observed=True,
+            as_index=False,
+        )
+        .agg(
+            Subjects=("Subject", "nunique"),
+            Mean_Change=("Change", "mean"),
+            SD_Change=("Change", "std"),
+            Increases=("Change", lambda values: int((values > 0).sum())),
+            Decreases=("Change", lambda values: int((values < 0).sum())),
+        )
+    )
+    valid_scale = local_summary["SD_Change"].abs() > 0
+    local_summary["Standardized_Change"] = pd.NA
+    local_summary.loc[valid_scale, "Standardized_Change"] = (
+        local_summary.loc[valid_scale, "Mean_Change"]
+        / local_summary.loc[valid_scale, "SD_Change"]
+    )
+    local_summary["Dominant_Count"] = local_summary[
+        ["Increases", "Decreases"]
+    ].max(axis=1)
+    local_summary["Consistency"] = (
+        local_summary["Dominant_Count"] / local_summary["Subjects"]
+    )
+    local_summary["Dominant_Direction"] = local_summary[
+        ["Increases", "Decreases"]
+    ].idxmax(axis=1).replace(
+        {"Increases": "increase", "Decreases": "decrease"}
+    )
+    local_summary["Absolute_Standardized"] = pd.to_numeric(
+        local_summary["Standardized_Change"], errors="coerce"
+    ).abs()
+
+    consistent_pattern = local_summary.sort_values(
+        ["Consistency", "Absolute_Standardized"],
+        ascending=[False, False],
+    ).iloc[0]
+    strongest_effect = local_summary.loc[
+        local_summary["Absolute_Standardized"].idxmax()
+    ]
+
+    return (
+        f"Across {len(band_specific):,} band-specific paired "
+        "subject-channel records, **"
+        f"{upward['Comparison']}** had the largest share of increases "
+        f"({int(upward['Increases'])}/{int(upward['Records'])}, "
+        f"{upward['Increase_Rate']:.1%}), while **{downward['Comparison']}** "
+        f"had the largest share of decreases ({int(downward['Decreases'])}/"
+        f"{int(downward['Records'])}, {downward['Decrease_Rate']:.1%}). The "
+        f"most consistent local pattern showed a dominant "
+        f"{consistent_pattern['Dominant_Direction']} in "
+        f"{consistent_pattern['Feature']} at "
+        f"{consistent_pattern['Channel']} ({consistent_pattern['Comparison']}, "
+        f"{int(consistent_pattern['Dominant_Count'])}/"
+        f"{int(consistent_pattern['Subjects'])} subjects). The largest "
+        f"standardized mean shift was {strongest_effect['Feature']} at "
+        f"{strongest_effect['Channel']} ({strongest_effect['Comparison']}, "
+        f"Cohen's dz = {float(strongest_effect['Standardized_Change']):+.3f})."
+    )
+
+
+def summarize_all_conditions_pre_post(selected_data):
+    """Summarize before-after values for every comparison-channel group."""
+    summary = (
+        selected_data.groupby(
+            ["Comparison", "Channel"], observed=True, as_index=False
+        )
+        .agg(
+            Subjects=("Subject", "nunique"),
+            Mean_Before=("Before", "mean"),
+            Mean_After=("After", "mean"),
+            Mean_Change=("Change", "mean"),
+            Median_Change=("Change", "median"),
+            SD_Change=("Change", "std"),
+            Increases=("Change", lambda values: int((values > 0).sum())),
+            Decreases=("Change", lambda values: int((values < 0).sum())),
+            No_Change=("Change", lambda values: int((values == 0).sum())),
+        )
+    )
+    valid_scale = summary["SD_Change"].abs() > 0
+    summary["Standardized_Change"] = pd.NA
+    summary.loc[valid_scale, "Standardized_Change"] = (
+        summary.loc[valid_scale, "Mean_Change"]
+        / summary.loc[valid_scale, "SD_Change"]
+    )
+
+    valid_baseline = summary["Mean_Before"].abs() > 0
+    summary["Mean_Change_Percent"] = pd.NA
+    summary.loc[valid_baseline, "Mean_Change_Percent"] = (
+        summary.loc[valid_baseline, "Mean_Change"]
+        / summary.loc[valid_baseline, "Mean_Before"].abs()
+        * 100
+    )
+    summary["After_Index"] = 100 + pd.to_numeric(
+        summary["Mean_Change_Percent"], errors="coerce"
+    )
+    summary["Dominant_Count"] = summary[
+        ["Increases", "Decreases", "No_Change"]
+    ].max(axis=1)
+    summary["Dominant_Direction"] = summary[
+        ["Increases", "Decreases", "No_Change"]
+    ].idxmax(axis=1).replace(
+        {
+            "Increases": "Increase",
+            "Decreases": "Decrease",
+            "No_Change": "No Change",
+        }
+    )
+    summary["Consistency"] = (
+        summary["Dominant_Count"] / summary["Subjects"]
+    )
+    summary["Comparison"] = pd.Categorical(
+        summary["Comparison"],
+        categories=ALL_CONDITIONS_COMPARISON_ORDER,
+        ordered=True,
+    )
+    summary["Channel"] = pd.Categorical(
+        summary["Channel"],
+        categories=ALL_CONDITIONS_CHANNEL_ORDER,
+        ordered=True,
+    )
+    return summary.sort_values(["Comparison", "Channel"]).reset_index(drop=True)
+
+
+def build_all_conditions_pre_post_index_figure(
+    summary, selected_band, selected_feature
+):
+    """Build four indexed dumbbell panels for comparable pre-post means."""
+    subplot_positions = {
+        "BCF vs ACF": (1, 1),
+        "BF vs AF": (1, 2),
+        "BCM vs ACM": (2, 1),
+        "BM vs AM": (2, 2),
+    }
+    figure = make_subplots(
+        rows=2,
+        cols=2,
+        shared_xaxes=True,
+        horizontal_spacing=0.11,
+        vertical_spacing=0.20,
+        subplot_titles=[
+            f"<b>{comparison}</b>"
+            for comparison in ALL_CONDITIONS_COMPARISON_ORDER
+        ],
+    )
+    channel_order = list(reversed(ALL_CONDITIONS_CHANNEL_ORDER))
+    after_values = pd.to_numeric(summary["After_Index"], errors="coerce")
+    lower_index = min(100.0, float(after_values.min()))
+    upper_index = max(100.0, float(after_values.max()))
+    visible_span = max(upper_index - lower_index, 10.0)
+    x_range = [
+        lower_index - visible_span * 0.18,
+        upper_index + visible_span * 0.18,
+    ]
+
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        row, column = subplot_positions[comparison]
+        comparison_data = (
+            summary[summary["Comparison"].astype(str) == comparison]
+            .set_index("Channel")
+            .reindex(channel_order)
+            .reset_index()
+        )
+        color = ALL_CONDITIONS_COMPARISON_COLORS[comparison]
+        line_x = []
+        line_y = []
+        for _, record in comparison_data.iterrows():
+            line_x.extend([100, record["After_Index"], None])
+            line_y.extend([record["Channel"], record["Channel"], None])
+
+        figure.add_trace(
+            go.Scatter(
+                x=line_x,
+                y=line_y,
+                mode="lines",
+                line=dict(color=all_conditions_hex_to_rgba(color, 0.72), width=5),
+                hoverinfo="skip",
+                showlegend=False,
+            ),
+            row=row,
+            col=column,
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=[100] * len(comparison_data),
+                y=comparison_data["Channel"],
+                mode="markers",
+                name="Before mean",
+                marker=dict(
+                    size=12,
+                    color="#F8FBF9",
+                    line=dict(color="#7D8C84", width=2),
+                    symbol="circle",
+                ),
+                customdata=comparison_data[["Mean_Before"]].to_numpy(),
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>Channel: %{{y}}<br>"
+                    f"{ALL_CONDITIONS_SUBJECT_LEVEL_SOURCES[comparison]['before']} "
+                    "mean: %{customdata[0]:,.4g}<br>Index: 100"
+                    "<extra></extra>"
+                ),
+                showlegend=comparison == ALL_CONDITIONS_COMPARISON_ORDER[0],
+                legendgroup="before",
+            ),
+            row=row,
+            col=column,
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=comparison_data["After_Index"],
+                y=comparison_data["Channel"],
+                mode="markers+text",
+                name="After mean",
+                marker=dict(
+                    size=14,
+                    color=color,
+                    line=dict(color="#FFFFFF", width=1.6),
+                    symbol=ALL_CONDITIONS_COMPARISON_SYMBOLS[comparison],
+                ),
+                text=comparison_data["Mean_Change_Percent"].map(
+                    lambda value: f"{float(value):+.1f}%"
+                ),
+                textposition=[
+                    "middle right" if float(value) >= 0 else "middle left"
+                    for value in comparison_data["Mean_Change_Percent"]
+                ],
+                textfont=dict(size=11, color="#24313A"),
+                customdata=comparison_data[
+                    ["Mean_After", "Mean_Change", "Mean_Change_Percent"]
+                ].to_numpy(),
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>Channel: %{{y}}<br>"
+                    f"{ALL_CONDITIONS_SUBJECT_LEVEL_SOURCES[comparison]['after']} "
+                    "mean: %{customdata[0]:,.4g}<br>"
+                    "Mean change: %{customdata[1]:+,.4g}<br>"
+                    "Mean change: %{customdata[2]:+.1f}%<br>"
+                    "Indexed after mean: %{x:.1f}<extra></extra>"
+                ),
+                showlegend=comparison == ALL_CONDITIONS_COMPARISON_ORDER[0],
+                legendgroup="after",
+            ),
+            row=row,
+            col=column,
+        )
+        figure.add_vline(
+            x=100,
+            line_width=1.6,
+            line_color="#68786F",
+            row=row,
+            col=column,
+        )
+        figure.update_xaxes(
+            range=x_range,
+            tickformat=".0f",
+            row=row,
+            col=column,
+        )
+        figure.update_yaxes(
+            categoryorder="array",
+            categoryarray=channel_order,
+            showgrid=False,
+            row=row,
+            col=column,
+        )
+
+    figure.update_layout(
+        title=(
+            "<b>Indexed Mean Pre-Post Shift</b><br>"
+            f"<sup>{selected_band} · {selected_feature} · "
+            "Before mean = 100 in every panel</sup>"
+        ),
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.03,
+            xanchor="right",
+            x=1,
+        ),
+        hovermode="closest",
+    )
+    figure.add_annotation(
+        x=0.5,
+        y=-0.12,
+        xref="paper",
+        yref="paper",
+        text="Mean feature level index (Before = 100)",
+        showarrow=False,
+        font=dict(size=12, color="#667085"),
+    )
+    figure = style_all_conditions_figure(figure, 665)
+    figure.update_layout(margin=dict(l=35, r=40, t=115, b=72))
+    return figure
+
+
+def build_all_conditions_pre_post_effect_heatmap(
+    summary, selected_band, selected_feature
+):
+    """Build an annotated heatmap of standardized paired mean changes."""
+    matrix = (
+        summary.pivot(
+            index="Comparison",
+            columns="Channel",
+            values="Standardized_Change",
+        )
+        .reindex(
+            index=ALL_CONDITIONS_COMPARISON_ORDER,
+            columns=ALL_CONDITIONS_CHANNEL_ORDER,
+        )
+        .apply(pd.to_numeric, errors="coerce")
+    )
+    percent_matrix = (
+        summary.pivot(
+            index="Comparison",
+            columns="Channel",
+            values="Mean_Change_Percent",
+        )
+        .reindex(
+            index=ALL_CONDITIONS_COMPARISON_ORDER,
+            columns=ALL_CONDITIONS_CHANNEL_ORDER,
+        )
+        .apply(pd.to_numeric, errors="coerce")
+    )
+    increase_matrix = (
+        summary.pivot(
+            index="Comparison", columns="Channel", values="Increases"
+        )
+        .reindex(
+            index=ALL_CONDITIONS_COMPARISON_ORDER,
+            columns=ALL_CONDITIONS_CHANNEL_ORDER,
+        )
+    )
+    decrease_matrix = (
+        summary.pivot(
+            index="Comparison", columns="Channel", values="Decreases"
+        )
+        .reindex(
+            index=ALL_CONDITIONS_COMPARISON_ORDER,
+            columns=ALL_CONDITIONS_CHANNEL_ORDER,
+        )
+    )
+    customdata = [
+        [
+            [
+                percent_matrix.iloc[row_index, column_index],
+                increase_matrix.iloc[row_index, column_index],
+                decrease_matrix.iloc[row_index, column_index],
+            ]
+            for column_index in range(len(matrix.columns))
+        ]
+        for row_index in range(len(matrix.index))
+    ]
+    maximum_effect = max(1.0, float(matrix.abs().max().max()))
+    figure = go.Figure(
+        go.Heatmap(
+            z=matrix.values,
+            x=matrix.columns.tolist(),
+            y=matrix.index.astype(str).tolist(),
+            zmin=-maximum_effect,
+            zmax=maximum_effect,
+            zmid=0,
+            colorscale=[
+                [0.00, "#3F7CAC"],
+                [0.50, "#F4F7F5"],
+                [1.00, "#F08A6B"],
+            ],
+            customdata=customdata,
+            colorbar=dict(title="Cohen's dz", thickness=14),
+            hovertemplate=(
+                "Comparison: %{y}<br>Channel: %{x}<br>"
+                "Cohen's dz: %{z:+.3f}<br>"
+                "Mean change: %{customdata[0]:+.1f}%<br>"
+                "Increased: %{customdata[1]:.0f}/10<br>"
+                "Decreased: %{customdata[2]:.0f}/10<extra></extra>"
+            ),
+        )
+    )
+    for comparison in matrix.index:
+        for channel in matrix.columns:
+            value = matrix.loc[comparison, channel]
+            label = "N/A" if pd.isna(value) else f"{value:+.2f}"
+            font_color = (
+                "#FFFFFF"
+                if pd.notna(value) and abs(value) >= maximum_effect * 0.62
+                else "#24313A"
+            )
+            figure.add_annotation(
+                x=channel,
+                y=str(comparison),
+                text=label,
+                showarrow=False,
+                font=dict(size=12, color=font_color),
+            )
+    figure.update_layout(
+        title=(
+            "<b>Standardized Paired Change</b><br>"
+            f"<sup>{selected_band} · {selected_feature} · "
+            "blue = lower after, peach = higher after</sup>"
+        ),
+        xaxis_title="EEG Channel",
+        yaxis_title="",
+        yaxis_autorange="reversed",
+    )
+    return style_all_conditions_figure(figure, 430)
+
+
+def build_all_conditions_pre_post_direction_figure(selected_data):
+    """Build a 100% stacked direction balance across comparisons."""
+    direction_order = ["Increase", "Decrease", "No Change"]
+    complete_index = pd.MultiIndex.from_product(
+        [ALL_CONDITIONS_COMPARISON_ORDER, direction_order],
+        names=["Comparison", "Direction"],
+    )
+    counts = (
+        selected_data.groupby(["Comparison", "Direction"], observed=True)
+        .size()
+        .reindex(complete_index, fill_value=0)
+        .rename("Records")
+        .reset_index()
+    )
+    totals = counts.groupby("Comparison")["Records"].transform("sum")
+    counts["Percentage"] = (
+        counts["Records"] / totals.where(totals > 0, 1) * 100
+    )
+    figure = go.Figure()
+    for direction in direction_order:
+        direction_data = counts[counts["Direction"] == direction]
+        labels = [
+            f"{int(records)}/{int(total)}" if percentage >= 10 and records else ""
+            for records, total, percentage in zip(
+                direction_data["Records"],
+                totals.loc[direction_data.index],
+                direction_data["Percentage"],
+            )
+        ]
+        figure.add_trace(
+            go.Bar(
+                x=direction_data["Percentage"],
+                y=direction_data["Comparison"],
+                orientation="h",
+                name=direction,
+                marker_color=ALL_CONDITIONS_DIRECTION_COLORS[direction],
+                text=labels,
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(
+                    color="#FFFFFF" if direction == "Increase" else "#26443A"
+                ),
+                customdata=direction_data[["Records"]].to_numpy(),
+                hovertemplate=(
+                    "Comparison: %{y}<br>Direction: %{fullData.name}<br>"
+                    "Subject-channel records: %{customdata[0]:.0f}<br>"
+                    "Share: %{x:.1f}%<extra></extra>"
+                ),
+            )
+        )
+    figure.update_layout(
+        title=(
+            "<b>Direction Balance</b><br>"
+            "<sup>40 paired subject-channel records per comparison</sup>"
+        ),
+        barmode="stack",
+        xaxis_title="Share of paired records",
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=list(reversed(ALL_CONDITIONS_COMPARISON_ORDER)),
+        ),
+    )
+    figure.update_xaxes(range=[0, 100], ticksuffix="%")
+    return style_all_conditions_figure(figure, 430)
+
+
+def build_all_conditions_pre_post_distribution_figure(
+    selected_data, selected_band, selected_feature
+):
+    """Build cross-condition distributions from every standardized change."""
+    figure = go.Figure()
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = selected_data[
+            selected_data["Comparison"].astype(str) == comparison
+        ].copy()
+        color = ALL_CONDITIONS_COMPARISON_COLORS[comparison]
+        figure.add_trace(
+            go.Box(
+                x=comparison_data["Standardized_Change"],
+                y=[comparison] * len(comparison_data),
+                orientation="h",
+                name=comparison,
+                boxpoints="all",
+                jitter=0.28,
+                pointpos=0,
+                boxmean=True,
+                fillcolor=all_conditions_hex_to_rgba(color, 0.18),
+                line=dict(color=color, width=2),
+                marker=dict(color=color, size=6, opacity=0.72),
+                customdata=comparison_data[
+                    ["Subject", "Channel", "Change", "Direction"]
+                ].to_numpy(),
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>"
+                    "Subject: %{customdata[0]}<br>"
+                    "Channel: %{customdata[1]}<br>"
+                    "Standardized change: %{x:+.2f} SD<br>"
+                    "Raw change: %{customdata[2]:+,.4g}<br>"
+                    "Direction: %{customdata[3]}<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+    maximum_change = max(
+        2.0,
+        float(selected_data["Standardized_Change"].abs().max()) * 1.12,
+    )
+    figure.add_vline(
+        x=0,
+        line_width=1.5,
+        line_dash="dash",
+        line_color="#68786F",
+    )
+    figure.update_layout(
+        title=(
+            "<b>Subject-Level Change Distribution</b><br>"
+            f"<sup>{selected_band} · {selected_feature} · "
+            "each dot is one subject-channel pair</sup>"
+        ),
+        xaxis=dict(
+            title="Standardized paired change (Δ / channel-specific SD)",
+            range=[-maximum_change, maximum_change],
+        ),
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=list(reversed(ALL_CONDITIONS_COMPARISON_ORDER)),
+        ),
+        showlegend=False,
+    )
+    return style_all_conditions_figure(figure, 420)
+
+
+def prepare_all_conditions_pre_post_display_table(summary):
+    """Prepare a readable channel summary for the selected pre-post view."""
+    table = summary.copy()
+    table["Mean Before"] = table["Mean_Before"].map(
+        lambda value: format_all_conditions_change(value, include_sign=False)
+    )
+    table["Mean After"] = table["Mean_After"].map(
+        lambda value: format_all_conditions_change(value, include_sign=False)
+    )
+    table["Mean Change"] = table["Mean_Change"].map(
+        format_all_conditions_change
+    )
+    table["Mean Change (%)"] = table["Mean_Change_Percent"].map(
+        lambda value: "N/A" if pd.isna(value) else f"{float(value):+.1f}%"
+    )
+    table["Cohen's dz"] = pd.to_numeric(
+        table["Standardized_Change"], errors="coerce"
+    ).map(lambda value: "N/A" if pd.isna(value) else f"{value:+.3f}")
+    table["Dominant Direction"] = table.apply(
+        lambda row: (
+            f"{row['Dominant_Direction']} "
+            f"({int(row['Dominant_Count'])}/{int(row['Subjects'])})"
+        ),
+        axis=1,
+    )
+    return table[
+        [
+            "Comparison",
+            "Channel",
+            "Subjects",
+            "Mean Before",
+            "Mean After",
+            "Mean Change",
+            "Mean Change (%)",
+            "Cohen's dz",
+            "Dominant Direction",
+        ]
+    ]
+
+
+def render_all_conditions_pre_post_visualizations():
+    """Render combined pre-post visualizations across all four comparisons."""
+    st.subheader("Combined pre-post visualizations")
+    st.caption(
+        "Compare normalized mean shifts, standardized paired changes, response "
+        "direction, and individual variability across all four condition pairs."
+    )
+    try:
+        dataframe = load_all_conditions_subject_level()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        BadZipFile,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep the four subject_level_master ZIP archives beside app.py or "
+            "inside data/ or assets/data/, then redeploy the application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_all_conditions_pre_post_key_finding(dataframe)
+        + " These patterns are descriptive; multiplicity-adjusted statistical "
+        "evidence is reported in the Paired Statistics & FDR tab."
+    )
+
+    filter_1, filter_2 = st.columns([0.9, 1.45])
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            ALL_CONDITIONS_BAND_ORDER,
+            index=0,
+            key="all_conditions_prepost_band",
+        )
+    band_data = dataframe[
+        dataframe["Band"].astype(str) == selected_band
+    ].copy()
+    preferred_features = [
+        f"{selected_band} Band Power",
+        f"{selected_band} Relative Power",
+        "Entropy",
+        "Hjorth Activity",
+        "Hjorth Mobility",
+        "Hjorth Complexity",
+    ]
+    available_features = set(band_data["Feature"].dropna().unique())
+    feature_options = [
+        feature for feature in preferred_features if feature in available_features
+    ]
+    with filter_2:
+        selected_feature = st.selectbox(
+            "Feature",
+            feature_options,
+            index=0,
+            key="all_conditions_prepost_feature",
+        )
+
+    selected_data = band_data[
+        band_data["Feature"] == selected_feature
+    ].copy()
+    if selected_data.empty:
+        st.warning("No pre-post rows match the selected filters.")
+        return
+
+    scale = selected_data.groupby(
+        ["Comparison", "Channel"], observed=True
+    )["Change"].transform("std")
+    scale = scale.where(scale.abs() > 0)
+    selected_data["Standardized_Change"] = selected_data["Change"] / scale
+    if selected_data["Standardized_Change"].isna().any():
+        st.warning(
+            "At least one comparison-channel group has zero change variance; "
+            "its standardized value cannot be displayed."
+        )
+
+    summary = summarize_all_conditions_pre_post(selected_data)
+    standardized_values = pd.to_numeric(
+        summary["Standardized_Change"], errors="coerce"
+    )
+    strongest = summary.loc[standardized_values.abs().idxmax()]
+    most_consistent = summary.assign(
+        Absolute_Standardized=standardized_values.abs()
+    ).sort_values(
+        ["Consistency", "Absolute_Standardized"], ascending=[False, False]
+    ).iloc[0]
+
+    direction_summary = (
+        selected_data.groupby("Comparison", observed=True)["Change"]
+        .agg(
+            Records="size",
+            Increases=lambda values: int((values > 0).sum()),
+            Decreases=lambda values: int((values < 0).sum()),
+        )
+        .reset_index()
+    )
+    direction_summary["Increase_Rate"] = (
+        direction_summary["Increases"] / direction_summary["Records"]
+    )
+    direction_summary["Decrease_Rate"] = (
+        direction_summary["Decreases"] / direction_summary["Records"]
+    )
+    selected_upward = direction_summary.loc[
+        direction_summary["Increase_Rate"].idxmax()
+    ]
+    selected_downward = direction_summary.loc[
+        direction_summary["Decrease_Rate"].idxmax()
+    ]
+
+    st.info(
+        f"**Selected-view finding.** For {selected_band} · "
+        f"{selected_feature}, the largest standardized mean shift occurred in "
+        f"**{strongest['Comparison']} at {strongest['Channel']}** "
+        f"(Cohen's dz = {float(strongest['Standardized_Change']):+.3f}; "
+        f"mean shift {float(strongest['Mean_Change_Percent']):+.1f}%). The "
+        f"most consistent local direction was a "
+        f"{str(most_consistent['Dominant_Direction']).lower()} in "
+        f"{most_consistent['Comparison']} at {most_consistent['Channel']} "
+        f"({int(most_consistent['Dominant_Count'])}/"
+        f"{int(most_consistent['Subjects'])} subjects). Across all channels, "
+        f"{selected_upward['Comparison']} had the highest increase share "
+        f"({selected_upward['Increase_Rate']:.1%}), while "
+        f"{selected_downward['Comparison']} had the highest decrease share "
+        f"({selected_downward['Decrease_Rate']:.1%})."
+    )
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Paired Subjects", int(selected_data["Subject"].nunique()))
+    metric_2.metric("Comparison-Channel Groups", len(summary))
+    with metric_3:
+        st.metric(
+            "Largest |Cohen's dz|",
+            f"{abs(float(strongest['Standardized_Change'])):.3f}",
+        )
+        st.caption(f"{strongest['Comparison']} · {strongest['Channel']}")
+    with metric_4:
+        st.metric(
+            "Most Consistent Direction",
+            f"{int(most_consistent['Dominant_Count'])} / "
+            f"{int(most_consistent['Subjects'])}",
+        )
+        st.caption(
+            f"{most_consistent['Comparison']} · "
+            f"{most_consistent['Channel']} · "
+            f"{most_consistent['Dominant_Direction']}"
+        )
+
+    st.plotly_chart(
+        build_all_conditions_pre_post_index_figure(
+            summary, selected_band, selected_feature
+        ),
+        use_container_width=True,
+        key="all_conditions_prepost_indexed_shift",
+    )
+    st.caption(
+        "Each mini-panel indexes its channel-level before mean to 100. The "
+        "coloured marker shows the after mean, and the adjacent label gives "
+        "the percentage shift. Indexing allows visually fair comparison while "
+        "raw means remain available on hover."
+    )
+
+    chart_1, chart_2 = st.columns([1.04, 0.96])
+    with chart_1:
+        st.plotly_chart(
+            build_all_conditions_pre_post_effect_heatmap(
+                summary, selected_band, selected_feature
+            ),
+            use_container_width=True,
+            key="all_conditions_prepost_effect_heatmap",
+        )
+    with chart_2:
+        st.plotly_chart(
+            build_all_conditions_pre_post_direction_figure(selected_data),
+            use_container_width=True,
+            key="all_conditions_prepost_direction_balance",
+        )
+    st.caption(
+        "The heatmap standardizes the mean paired change by the SD of paired "
+        "changes within each comparison-channel group. The direction chart "
+        "shows descriptive counts across 10 subjects × 4 channels."
+    )
+
+    st.plotly_chart(
+        build_all_conditions_pre_post_distribution_figure(
+            selected_data, selected_band, selected_feature
+        ),
+        use_container_width=True,
+        key="all_conditions_prepost_distribution",
+    )
+    st.caption(
+        "Every dot is retained. Standardization is performed separately within "
+        "each comparison-channel group so zero and direction remain meaningful "
+        "while groups with different raw scales share one axis."
+    )
+
+    with st.expander("View channel-level pre-post summary", expanded=False):
+        st.dataframe(
+            prepare_all_conditions_pre_post_display_table(summary),
+            use_container_width=True,
+            hide_index=True,
+        )
+        download_columns = [
+            "Comparison",
+            "Band",
+            "Subject",
+            "Channel",
+            "Feature_Type",
+            "Feature",
+            "Before",
+            "After",
+            "Change",
+            "Standardized_Change",
+            "Direction",
+        ]
+        st.download_button(
+            "Download selected pre-post data",
+            data=selected_data[download_columns]
+            .to_csv(index=False)
+            .encode("utf-8"),
+            file_name=(
+                "all_conditions_prepost_"
+                + selected_band.lower()
+                + "_"
+                + selected_feature.lower().replace(" ", "_")
+                + ".csv"
+            ),
+            mime="text/csv",
+            key="all_conditions_prepost_download",
+        )
+
+    with st.expander("Visualization and methodological notes", expanded=False):
+        st.markdown(
+            """
+- Change is calculated as **after − before** for every paired subject observation.
+- The indexed dumbbell chart sets each channel's before mean to 100. Percentage change uses the absolute before mean as its denominator so the sign of the paired change remains explicit.
+- Cohen's dz is calculated descriptively as mean paired change divided by the SD of paired changes. Statistical significance and source FDR q-values remain in the **Paired Statistics & FDR** tab.
+- Distribution values are divided by their comparison-channel change SD without mean-centring; zero and change direction are therefore preserved.
+- Band Power and Relative Power are band-specific. Entropy and Hjorth measures are broadband rows repeated across band archives and should be interpreted once for the selected view—not pooled five times.
+- These graphics describe the 10 paired subjects and do not establish clinical efficacy, causality, or population-level generalizability.
+            """
+        )
+
+
+def classify_all_conditions_quality_gap(value):
+    """Assign a transparent descriptive review band to a normalized gap."""
+    if value <= 0.25:
+        return "Close match"
+    if value <= 0.50:
+        return "Moderate gap"
+    return "Review"
+
+
+@st.cache_data
+def load_all_conditions_synthetic_quality():
+    """Combine the four validated Real-versus-Synthetic quality datasets."""
+    source_loaders = {
+        "BCF vs ACF": load_bcf_acf_synthetic_quality,
+        "BF vs AF": load_bf_af_synthetic_quality,
+        "BCM vs ACM": load_bcm_acm_synthetic_quality,
+        "BM vs AM": load_bm_am_synthetic_quality,
+    }
+    frames = []
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        try:
+            frame = source_loaders[comparison]().copy()
+        except (
+            FileNotFoundError,
+            ValueError,
+            KeyError,
+            BadZipFile,
+            pd.errors.ParserError,
+        ) as error:
+            raise ValueError(f"{comparison}: {error}") from error
+        frame["Comparison"] = comparison
+        frame["Stage"] = frame["Label"].map(
+            {0: "Before condition", 1: "After condition"}
+        )
+        frames.append(frame)
+
+    dataframe = pd.concat(frames, ignore_index=True, sort=False)
+    if dataframe["Stage"].isna().any():
+        raise ValueError(
+            "Synthetic-quality labels must use 0 for before and 1 for after."
+        )
+
+    expected_comparisons = set(ALL_CONDITIONS_COMPARISON_ORDER)
+    if set(dataframe["Comparison"].unique()) != expected_comparisons:
+        raise ValueError(
+            "Synthetic-quality data do not contain all four comparisons."
+        )
+    if set(dataframe["Band"].unique()) != set(ALL_CONDITIONS_BAND_ORDER):
+        raise ValueError(
+            "Synthetic-quality data do not contain all five frequency bands."
+        )
+
+    duplicate_rows = dataframe.duplicated(
+        ["Comparison", "Band", "Condition", "Channel", "Feature"]
+    )
+    if duplicate_rows.any():
+        raise ValueError(
+            "Duplicate comparison-band-condition-channel-feature rows were "
+            "found in the combined synthetic-quality data."
+        )
+
+    dataframe["Feature_Type"] = "Broadband feature"
+    dataframe.loc[
+        dataframe["Feature"].str.endswith("_BP"), "Feature_Type"
+    ] = "Band Power"
+    dataframe.loc[
+        dataframe["Feature"].str.endswith("_RP"), "Feature_Type"
+    ] = "Relative Power"
+
+    pooled_scale = (
+        (
+            dataframe["Real_SD"].pow(2)
+            + dataframe["Synthetic_SD"].pow(2)
+        )
+        / 2
+    ).pow(0.5)
+    positive_scale = (
+        (pooled_scale > 0)
+        & (dataframe["Real_SD"] > 0)
+        & (dataframe["Synthetic_SD"] > 0)
+        & (dataframe["Real_IQR"] > 0)
+        & (dataframe["Synthetic_IQR"] > 0)
+    )
+    if not positive_scale.all():
+        raise ValueError(
+            "Normalized feature-quality gaps require positive SD and IQR "
+            "values in every summary row."
+        )
+
+    dataframe["Normalized_Mean_Gap"] = (
+        dataframe["Synthetic_Mean"] - dataframe["Real_Mean"]
+    ).abs() / pooled_scale
+    dataframe["Normalized_Median_Gap"] = (
+        dataframe["Synthetic_Median"] - dataframe["Real_Median"]
+    ).abs() / pooled_scale
+    dataframe["Normalized_SD_Gap"] = (
+        dataframe["Synthetic_SD"] / dataframe["Real_SD"]
+    ).map(lambda value: abs(log(float(value))))
+    dataframe["Normalized_IQR_Gap"] = (
+        dataframe["Synthetic_IQR"] / dataframe["Real_IQR"]
+    ).map(lambda value: abs(log(float(value))))
+    component_columns = [
+        "Normalized_Mean_Gap",
+        "Normalized_SD_Gap",
+        "Normalized_Median_Gap",
+        "Normalized_IQR_Gap",
+    ]
+    dataframe["Normalized_Composite_Gap"] = dataframe[
+        component_columns
+    ].mean(axis=1)
+    dataframe["Quality_Status"] = dataframe[
+        "Normalized_Composite_Gap"
+    ].map(classify_all_conditions_quality_gap)
+    dataframe["Comparison"] = pd.Categorical(
+        dataframe["Comparison"],
+        categories=ALL_CONDITIONS_COMPARISON_ORDER,
+        ordered=True,
+    )
+    dataframe["Band"] = pd.Categorical(
+        dataframe["Band"],
+        categories=ALL_CONDITIONS_BAND_ORDER,
+        ordered=True,
+    )
+    return dataframe.sort_values(
+        ["Comparison", "Band", "Condition", "Channel", "Feature"]
+    ).reset_index(drop=True)
+
+
+def get_all_conditions_synthetic_quality_key_finding(dataframe):
+    """Create a concise global feature-quality finding from all four pairs."""
+    comparison_gaps = dataframe.groupby("Comparison", observed=True)[
+        "Normalized_Composite_Gap"
+    ].mean()
+    band_gaps = dataframe.groupby("Band", observed=True)[
+        "Normalized_Composite_Gap"
+    ].mean()
+    close_counts = (
+        dataframe.assign(
+            Close=dataframe["Normalized_Composite_Gap"] <= 0.25
+        )
+        .groupby("Comparison", observed=True)["Close"]
+        .agg(["sum", "count", "mean"])
+    )
+    closest_comparison = comparison_gaps.idxmin()
+    widest_comparison = comparison_gaps.idxmax()
+    strongest_coverage = close_counts["mean"].idxmax()
+    review_row = dataframe.loc[
+        dataframe["Normalized_Composite_Gap"].idxmax()
+    ]
+    return (
+        f"Across {len(dataframe):,} validated Real-versus-Synthetic summary "
+        f"rows, **{closest_comparison}** had the lowest average normalized "
+        f"gap ({comparison_gaps.min():.3f}), while **{widest_comparison}** "
+        f"had the highest ({comparison_gaps.max():.3f}). "
+        f"{band_gaps.idxmin()} showed the closest band-level agreement "
+        f"({band_gaps.min():.3f}); {band_gaps.idxmax()} showed the widest "
+        f"({band_gaps.max():.3f}). **{strongest_coverage}** had the largest "
+        f"close-match share ({int(close_counts.loc[strongest_coverage, 'sum'])}/"
+        f"{int(close_counts.loc[strongest_coverage, 'count'])}, "
+        f"{close_counts.loc[strongest_coverage, 'mean']:.1%}). The largest "
+        f"single discrepancy was {review_row['Feature_Display']} at "
+        f"{review_row['Channel']} for {review_row['Condition']} in "
+        f"{review_row['Band']} ({review_row['Comparison']}; normalized gap "
+        f"{review_row['Normalized_Composite_Gap']:.3f})."
+    )
+
+
+def get_all_conditions_synthetic_quality_selected_finding(
+    selected_data,
+    selected_band,
+    selected_stage,
+    selected_metric,
+):
+    """Explain the currently selected cross-condition quality view."""
+    metric_column = ALL_CONDITIONS_QUALITY_COMPONENTS[selected_metric]["column"]
+    comparison_gaps = selected_data.groupby("Comparison", observed=True)[
+        metric_column
+    ].mean()
+    closest_comparison = comparison_gaps.idxmin()
+    widest_comparison = comparison_gaps.idxmax()
+    close_count = int((selected_data[metric_column] <= 0.25).sum())
+    review_row = selected_data.loc[selected_data[metric_column].idxmax()]
+    band_text = "all five bands" if selected_band == "All Bands" else selected_band
+    stage_text = selected_stage.lower()
+    return (
+        f"For {band_text} and {stage_text}, **{closest_comparison}** showed "
+        f"the closest average {selected_metric.lower()} "
+        f"({comparison_gaps.min():.3f}), compared with "
+        f"{comparison_gaps.max():.3f} for {widest_comparison}. "
+        f"{close_count} of {len(selected_data)} rows "
+        f"({close_count / len(selected_data):.1%}) were within the "
+        f"≤0.25 close-match guide. The largest selected-view gap was "
+        f"{review_row['Feature_Display']} at {review_row['Channel']} for "
+        f"{review_row['Condition']} in {review_row['Band']} "
+        f"({review_row['Comparison']}; {review_row[metric_column]:.3f})."
+    )
+
+
+def summarize_all_conditions_synthetic_quality(selected_data, metric_column):
+    """Summarize selected normalized quality gaps by comparison."""
+    records = []
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = selected_data[
+            selected_data["Comparison"].astype(str) == comparison
+        ]
+        values = comparison_data[metric_column]
+        records.append(
+            {
+                "Comparison": comparison,
+                "Rows": len(comparison_data),
+                "Average_Gap": values.mean(),
+                "Median_Gap": values.median(),
+                "Close_Matches": int((values <= 0.25).sum()),
+                "Moderate_Gaps": int(
+                    ((values > 0.25) & (values <= 0.50)).sum()
+                ),
+                "Review_Rows": int((values > 0.50).sum()),
+            }
+        )
+    summary = pd.DataFrame(records)
+    summary["Close_Rate"] = summary["Close_Matches"] / summary["Rows"]
+    return summary
+
+
+def build_all_conditions_quality_profile_figure(
+    selected_data, selected_band, selected_stage
+):
+    """Build a grouped profile of all normalized quality-gap components."""
+    component_columns = [
+        ("Mean", "Normalized_Mean_Gap"),
+        ("SD", "Normalized_SD_Gap"),
+        ("Median", "Normalized_Median_Gap"),
+        ("IQR", "Normalized_IQR_Gap"),
+        ("Composite", "Normalized_Composite_Gap"),
+    ]
+    figure = go.Figure()
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = selected_data[
+            selected_data["Comparison"].astype(str) == comparison
+        ]
+        values = [
+            comparison_data[column].mean()
+            for _, column in component_columns
+        ]
+        figure.add_trace(
+            go.Bar(
+                x=[label for label, _ in component_columns],
+                y=values,
+                name=comparison,
+                marker=dict(
+                    color=ALL_CONDITIONS_COMPARISON_COLORS[comparison],
+                    line=dict(color="#FFFFFF", width=0.8),
+                ),
+                text=[f"{value:.2f}" for value in values],
+                textposition="outside",
+                cliponaxis=False,
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>Component: %{{x}}<br>"
+                    "Average normalized gap: %{y:.3f}<extra></extra>"
+                ),
+            )
+        )
+    band_text = "All bands" if selected_band == "All Bands" else selected_band
+    figure.update_layout(
+        title=(
+            "<b>Cross-Condition Feature-Fidelity Profile</b><br>"
+            f"<sup>{band_text} · {selected_stage} · lower bars indicate "
+            "closer Real-Synthetic agreement</sup>"
+        ),
+        barmode="group",
+        bargap=0.22,
+        bargroupgap=0.06,
+        xaxis_title="Summary component",
+        yaxis_title="Average normalized gap",
+        hovermode="x unified",
+    )
+    maximum_value = max(max(trace.y) for trace in figure.data)
+    figure.update_yaxes(range=[0, maximum_value * 1.28])
+    figure = style_all_conditions_figure(figure, 535)
+    figure.update_layout(margin=dict(l=45, r=25, t=105, b=45))
+    return figure
+
+
+def build_all_conditions_quality_heatmap(
+    selected_data,
+    selected_metric,
+):
+    """Build an annotated comparison-by-band quality-gap heatmap."""
+    metric_column = ALL_CONDITIONS_QUALITY_COMPONENTS[selected_metric]["column"]
+    band_order = [
+        band
+        for band in ALL_CONDITIONS_BAND_ORDER
+        if band in set(selected_data["Band"].astype(str))
+    ]
+    matrix = (
+        selected_data.groupby(["Comparison", "Band"], observed=True)[
+            metric_column
+        ]
+        .mean()
+        .unstack()
+        .reindex(
+            index=ALL_CONDITIONS_COMPARISON_ORDER,
+            columns=band_order,
+        )
+    )
+    maximum_gap = max(0.75, float(matrix.max().max()) * 1.05)
+    figure = go.Figure(
+        go.Heatmap(
+            z=matrix.values,
+            x=matrix.columns.astype(str).tolist(),
+            y=matrix.index.astype(str).tolist(),
+            zmin=0,
+            zmax=maximum_gap,
+            colorscale=[
+                [0.00, "#2F8F6D"],
+                [0.28, "#A8D8C2"],
+                [0.55, "#F4E7C8"],
+                [0.78, "#F2B08D"],
+                [1.00, "#D96F62"],
+            ],
+            colorbar=dict(title="Normalized<br>gap", thickness=14),
+            hovertemplate=(
+                "Comparison: %{y}<br>Band: %{x}<br>"
+                "Average normalized gap: %{z:.3f}<extra></extra>"
+            ),
+        )
+    )
+    for comparison in matrix.index:
+        for band in matrix.columns:
+            value = matrix.loc[comparison, band]
+            figure.add_annotation(
+                x=str(band),
+                y=str(comparison),
+                text="N/A" if pd.isna(value) else f"{value:.2f}",
+                showarrow=False,
+                font=dict(
+                    size=12,
+                    color=(
+                        "#FFFFFF"
+                        if pd.notna(value)
+                        and (
+                            value <= maximum_gap * 0.18
+                            or value >= maximum_gap * 0.78
+                        )
+                        else "#24313A"
+                    ),
+                ),
+            )
+    figure.update_layout(
+        title=(
+            "<b>Agreement Landscape by Frequency Band</b><br>"
+            f"<sup>{selected_metric} · green = closer agreement, "
+            "peach = larger discrepancy</sup>"
+        ),
+        xaxis_title="Frequency band",
+        yaxis_title="",
+        yaxis_autorange="reversed",
+        showlegend=False,
+    )
+    figure = style_all_conditions_figure(figure, 430)
+    figure.update_layout(margin=dict(l=20, r=30, t=100, b=45))
+    return figure
+
+
+def build_all_conditions_quality_coverage_figure(
+    selected_data,
+    selected_metric,
+):
+    """Build a 100% stacked chart of transparent review-band coverage."""
+    metric_column = ALL_CONDITIONS_QUALITY_COMPONENTS[selected_metric]["column"]
+    classified = selected_data[["Comparison", metric_column]].copy()
+    classified["Status"] = classified[metric_column].map(
+        classify_all_conditions_quality_gap
+    )
+    complete_index = pd.MultiIndex.from_product(
+        [ALL_CONDITIONS_COMPARISON_ORDER, ALL_CONDITIONS_QUALITY_STATUS_ORDER],
+        names=["Comparison", "Status"],
+    )
+    counts = (
+        classified.groupby(["Comparison", "Status"], observed=True)
+        .size()
+        .reindex(complete_index, fill_value=0)
+        .rename("Rows")
+        .reset_index()
+    )
+    totals = counts.groupby("Comparison")["Rows"].transform("sum")
+    counts["Percentage"] = counts["Rows"] / totals.where(totals > 0, 1) * 100
+    figure = go.Figure()
+    for status in ALL_CONDITIONS_QUALITY_STATUS_ORDER:
+        status_data = counts[counts["Status"] == status]
+        labels = [
+            f"{int(rows)}<br>{percentage:.0f}%" if percentage >= 9 else ""
+            for rows, percentage in zip(
+                status_data["Rows"], status_data["Percentage"]
+            )
+        ]
+        figure.add_trace(
+            go.Bar(
+                x=status_data["Percentage"],
+                y=status_data["Comparison"],
+                orientation="h",
+                name=status,
+                marker=dict(
+                    color=ALL_CONDITIONS_QUALITY_STATUS_COLORS[status],
+                    line=dict(color="#FFFFFF", width=0.8),
+                ),
+                text=labels,
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(
+                    color="#FFFFFF" if status != "Moderate gap" else "#5A461A"
+                ),
+                customdata=status_data[["Rows"]].to_numpy(),
+                hovertemplate=(
+                    "Comparison: %{y}<br>Review class: %{fullData.name}<br>"
+                    "Summary rows: %{customdata[0]:.0f}<br>"
+                    "Share: %{x:.1f}%<extra></extra>"
+                ),
+            )
+        )
+    figure.update_layout(
+        title=(
+            "<b>Feature-Match Coverage</b><br>"
+            f"<sup>{selected_metric} · close ≤ 0.25 · moderate 0.25–0.50 · "
+            "review &gt; 0.50</sup>"
+        ),
+        barmode="stack",
+        xaxis_title="Share of Real-Synthetic summary rows",
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=list(reversed(ALL_CONDITIONS_COMPARISON_ORDER)),
+        ),
+    )
+    figure.update_xaxes(range=[0, 100], ticksuffix="%")
+    figure = style_all_conditions_figure(figure, 430)
+    figure.update_layout(margin=dict(l=20, r=20, t=100, b=45))
+    return figure
+
+
+def build_all_conditions_quality_distribution_figure(
+    selected_data,
+    selected_metric,
+    selected_band,
+    selected_stage,
+):
+    """Show every selected normalized gap alongside comparison box plots."""
+    metric_config = ALL_CONDITIONS_QUALITY_COMPONENTS[selected_metric]
+    metric_column = metric_config["column"]
+    figure = go.Figure()
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        comparison_data = selected_data[
+            selected_data["Comparison"].astype(str) == comparison
+        ]
+        color = ALL_CONDITIONS_COMPARISON_COLORS[comparison]
+        figure.add_trace(
+            go.Box(
+                x=comparison_data[metric_column],
+                y=[comparison] * len(comparison_data),
+                orientation="h",
+                name=comparison,
+                boxpoints="all",
+                jitter=0.34,
+                pointpos=0,
+                boxmean=True,
+                fillcolor=all_conditions_hex_to_rgba(color, 0.16),
+                line=dict(color=color, width=2),
+                marker=dict(color=color, size=5, opacity=0.48),
+                customdata=comparison_data[
+                    ["Band", "Stage", "Condition", "Channel", "Feature_Display"]
+                ].astype(str).to_numpy(),
+                hovertemplate=(
+                    f"<b>{comparison}</b><br>Band: %{{customdata[0]}}<br>"
+                    "Stage: %{customdata[1]} (%{customdata[2]})<br>"
+                    "Channel: %{customdata[3]}<br>Feature: %{customdata[4]}<br>"
+                    f"{selected_metric}: %{{x:.3f}}<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+    maximum_gap = max(0.80, float(selected_data[metric_column].max()) * 1.08)
+    figure.add_vrect(
+        x0=0,
+        x1=0.25,
+        fillcolor="rgba(47,143,109,0.08)",
+        line_width=0,
+        layer="below",
+    )
+    figure.add_vrect(
+        x0=0.25,
+        x1=0.50,
+        fillcolor="rgba(230,184,92,0.08)",
+        line_width=0,
+        layer="below",
+    )
+    figure.add_vline(
+        x=0.25,
+        line_color="#2F8F6D",
+        line_dash="dot",
+        line_width=1.4,
+    )
+    figure.add_vline(
+        x=0.50,
+        line_color="#D58468",
+        line_dash="dot",
+        line_width=1.4,
+    )
+    band_text = "All bands" if selected_band == "All Bands" else selected_band
+    figure.update_layout(
+        title=(
+            "<b>Distribution of Real-Synthetic Discrepancy</b><br>"
+            f"<sup>{selected_metric} · {band_text} · {selected_stage} · "
+            "every dot is retained</sup>"
+        ),
+        xaxis=dict(
+            title=metric_config["axis_label"],
+            range=[0, maximum_gap],
+        ),
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=list(reversed(ALL_CONDITIONS_COMPARISON_ORDER)),
+        ),
+        showlegend=False,
+    )
+    figure = style_all_conditions_figure(figure, 445)
+    figure.update_layout(margin=dict(l=20, r=25, t=100, b=50))
+    return figure
+
+
+def prepare_all_conditions_quality_review_table(
+    selected_data,
+    selected_metric,
+):
+    """Prepare the highest-gap summary rows for review."""
+    metric_column = ALL_CONDITIONS_QUALITY_COMPONENTS[selected_metric]["column"]
+    table = selected_data.nlargest(12, metric_column).copy()
+    table["Selected Gap"] = table[metric_column].map(lambda value: f"{value:.3f}")
+    table["Composite Gap"] = table["Normalized_Composite_Gap"].map(
+        lambda value: f"{value:.3f}"
+    )
+    table["Real Mean"] = table["Real_Mean"].map(lambda value: f"{value:.4f}")
+    table["Synthetic Mean"] = table["Synthetic_Mean"].map(
+        lambda value: f"{value:.4f}"
+    )
+    return table[
+        [
+            "Comparison",
+            "Band",
+            "Stage",
+            "Condition",
+            "Channel",
+            "Feature_Display",
+            "Selected Gap",
+            "Composite Gap",
+            "Real Mean",
+            "Synthetic Mean",
+        ]
+    ].rename(columns={"Feature_Display": "Feature"})
+
+
+def render_all_conditions_synthetic_feature_quality():
+    """Render feature-quality validation across all four condition pairs."""
+    st.subheader("Synthetic feature quality across conditions")
+    st.caption(
+        "Compare Real and ACGAN-generated descriptive summaries on one "
+        "scale across four condition pairs, five frequency bands, four EEG "
+        "channels, and six feature types."
+    )
+    try:
+        dataframe = load_all_conditions_synthetic_quality()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        BadZipFile,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(str(error))
+        st.info(
+            "Keep the four synthetic_quality_master ZIP archives beside "
+            "app.py or inside data/ or assets/data/, then redeploy the "
+            "application."
+        )
+        return
+
+    st.success(
+        "**Key finding.** "
+        + get_all_conditions_synthetic_quality_key_finding(dataframe)
+    )
+
+    filter_1, filter_2, filter_3 = st.columns([0.85, 1.05, 1.35])
+    with filter_1:
+        selected_band = st.selectbox(
+            "Frequency band",
+            ["All Bands"] + ALL_CONDITIONS_BAND_ORDER,
+            index=0,
+            key="all_conditions_quality_band",
+        )
+    with filter_2:
+        selected_stage = st.selectbox(
+            "Condition stage",
+            ["Both stages", "Before conditions", "After conditions"],
+            index=0,
+            key="all_conditions_quality_stage",
+        )
+    with filter_3:
+        selected_metric = st.selectbox(
+            "Displayed discrepancy",
+            list(ALL_CONDITIONS_QUALITY_COMPONENTS),
+            index=0,
+            key="all_conditions_quality_metric",
+        )
+
+    selected_data = dataframe.copy()
+    if selected_band != "All Bands":
+        selected_data = selected_data[
+            selected_data["Band"].astype(str) == selected_band
+        ].copy()
+    stage_lookup = {
+        "Before conditions": "Before condition",
+        "After conditions": "After condition",
+    }
+    if selected_stage in stage_lookup:
+        selected_data = selected_data[
+            selected_data["Stage"] == stage_lookup[selected_stage]
+        ].copy()
+    if selected_data.empty:
+        st.warning("No synthetic-quality rows match the selected filters.")
+        return
+
+    metric_config = ALL_CONDITIONS_QUALITY_COMPONENTS[selected_metric]
+    metric_column = metric_config["column"]
+    summary = summarize_all_conditions_synthetic_quality(
+        selected_data, metric_column
+    )
+    closest = summary.loc[summary["Average_Gap"].idxmin()]
+    close_total = int((selected_data[metric_column] <= 0.25).sum())
+
+    st.info(
+        "**Selected-view finding.** "
+        + get_all_conditions_synthetic_quality_selected_finding(
+            selected_data,
+            selected_band,
+            selected_stage,
+            selected_metric,
+        )
+    )
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Feature Summary Rows", f"{len(selected_data):,}")
+    metric_2.metric(
+        "Average Normalized Gap",
+        f"{selected_data[metric_column].mean():.3f}",
+    )
+    metric_3.metric(
+        "Close-Match Rows",
+        f"{close_total} / {len(selected_data)}",
+        delta=f"{close_total / len(selected_data):.1%}",
+        delta_color="off",
+    )
+    with metric_4:
+        st.metric("Closest Comparison", closest["Comparison"])
+        st.caption(f"Average gap {closest['Average_Gap']:.3f}")
+
+    st.plotly_chart(
+        build_all_conditions_quality_profile_figure(
+            selected_data,
+            selected_band,
+            selected_stage,
+        ),
+        use_container_width=True,
+        key="all_conditions_quality_profile",
+    )
+    st.caption(
+        "Mean and median gaps are expressed in pooled Real-Synthetic SD "
+        "units. SD and IQR gaps use absolute log ratios. Composite is the "
+        "unweighted average of those four scale-compatible components."
+    )
+
+    chart_1, chart_2 = st.columns([1.08, 0.92])
+    with chart_1:
+        st.plotly_chart(
+            build_all_conditions_quality_heatmap(
+                selected_data,
+                selected_metric,
+            ),
+            use_container_width=True,
+            key="all_conditions_quality_heatmap",
+        )
+    with chart_2:
+        st.plotly_chart(
+            build_all_conditions_quality_coverage_figure(
+                selected_data,
+                selected_metric,
+            ),
+            use_container_width=True,
+            key="all_conditions_quality_coverage",
+        )
+    st.caption(
+        "The heatmap compares average discrepancies on a common scale. The "
+        "coverage chart applies the same transparent descriptive guide to "
+        "every selected Real-Synthetic summary row."
+    )
+
+    st.plotly_chart(
+        build_all_conditions_quality_distribution_figure(
+            selected_data,
+            selected_metric,
+            selected_band,
+            selected_stage,
+        ),
+        use_container_width=True,
+        key="all_conditions_quality_distribution",
+    )
+    st.caption(
+        "Every selected row is retained. Boxes summarize the median and "
+        "interquartile range; the shaded green zone marks the ≤0.25 "
+        "close-match guide and the dotted lines show both review cutoffs."
+    )
+
+    with st.expander("View features requiring closer validation", expanded=False):
+        st.dataframe(
+            prepare_all_conditions_quality_review_table(
+                selected_data,
+                selected_metric,
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        download_columns = [
+            "Comparison",
+            "Band",
+            "Stage",
+            "Condition",
+            "Channel",
+            "Feature",
+            "Feature_Type",
+            "Real_Mean",
+            "Synthetic_Mean",
+            "Real_SD",
+            "Synthetic_SD",
+            "Real_Median",
+            "Synthetic_Median",
+            "Real_IQR",
+            "Synthetic_IQR",
+            "Normalized_Mean_Gap",
+            "Normalized_SD_Gap",
+            "Normalized_Median_Gap",
+            "Normalized_IQR_Gap",
+            "Normalized_Composite_Gap",
+            "Quality_Status",
+            "Real_N",
+            "Synthetic_N",
+        ]
+        st.download_button(
+            "Download selected feature-quality data",
+            data=selected_data[download_columns]
+            .to_csv(index=False)
+            .encode("utf-8"),
+            file_name=(
+                "all_conditions_synthetic_feature_quality_"
+                + selected_band.lower().replace(" ", "_")
+                + "_"
+                + selected_stage.lower().replace(" ", "_")
+                + ".csv"
+            ),
+            mime="text/csv",
+            key="all_conditions_quality_download",
+        )
+
+    with st.expander("Visualization and methodological notes", expanded=False):
+        st.markdown(
+            """
+- Each row compares the Real and Synthetic descriptive summaries for one comparison, frequency-band model, condition, EEG channel, and feature.
+- Mean and median differences are divided by the pooled Real-Synthetic SD: `sqrt((Real SD² + Synthetic SD²) / 2)`. A value of 0 means exact location agreement.
+- SD and IQR discrepancies are absolute natural-log ratios. They are symmetric: swapping Real and Synthetic does not change the result, and 0 means exact scale agreement.
+- The composite normalized gap is the unweighted average of mean, SD, median, and IQR discrepancies. Lower values indicate closer descriptive agreement.
+- **Close match (≤0.25)**, **Moderate gap (0.25–0.50)**, and **Review (>0.50)** are transparent dashboard guides, not source-provided or clinically validated quality classes.
+- Entropy and Hjorth summaries are retained within every frequency-band ACGAN output because the Synthetic values can differ between band-specific generators.
+- These graphics assess descriptive summary fidelity. They do not establish distributional equivalence or statistical significance; use **Quantitative Similarity** for the configured correlation and distance metrics.
+            """
+        )
+
+
+def render_subject_10_all_conditions():
+    """Render a combined, read-only summary across all four comparison conditions."""
+    summary_data = pd.DataFrame(
+        [
+            {
+                "Comparison": "BCF vs ACF",
+                "Status": "Completed",
+                "EEG Segments": 8540,
+                "Training": int(SUBJECT_10_SPLIT.loc[0, "Samples"]),
+                "Validation": int(SUBJECT_10_SPLIT.loc[1, "Samples"]),
+                "Test": int(SUBJECT_10_SPLIT.loc[2, "Samples"]),
+                "Best Band": SUBJECT_10_TEST_RESULTS.loc[
+                    SUBJECT_10_TEST_RESULTS["Accuracy"].idxmax(), "Band"
+                ],
+                "Best Model": SUBJECT_10_TEST_RESULTS.loc[
+                    SUBJECT_10_TEST_RESULTS["Accuracy"].idxmax(), "Model"
+                ],
+                "Best Test Accuracy": SUBJECT_10_TEST_RESULTS["Accuracy"].max(),
+            },
+            {
+                "Comparison": "BF vs AF",
+                "Status": "Completed",
+                "EEG Segments": 3600,
+                "Training": int(SUBJECT_10_BF_AF_SPLIT.loc[0, "Samples"]),
+                "Validation": int(SUBJECT_10_BF_AF_SPLIT.loc[1, "Samples"]),
+                "Test": int(SUBJECT_10_BF_AF_SPLIT.loc[2, "Samples"]),
+                "Best Band": SUBJECT_10_BF_AF_TEST_RESULTS.loc[
+                    SUBJECT_10_BF_AF_TEST_RESULTS["Accuracy"].idxmax(), "Band"
+                ],
+                "Best Model": SUBJECT_10_BF_AF_TEST_RESULTS.loc[
+                    SUBJECT_10_BF_AF_TEST_RESULTS["Accuracy"].idxmax(), "Model"
+                ],
+                "Best Test Accuracy": SUBJECT_10_BF_AF_TEST_RESULTS["Accuracy"].max(),
+            },
+            {
+                "Comparison": "BCM vs ACM",
+                "Status": "Completed",
+                "EEG Segments": 8220,
+                "Training": int(SUBJECT_10_BCM_ACM_SPLIT.loc[0, "Samples"]),
+                "Validation": int(SUBJECT_10_BCM_ACM_SPLIT.loc[1, "Samples"]),
+                "Test": int(SUBJECT_10_BCM_ACM_SPLIT.loc[2, "Samples"]),
+                "Best Band": SUBJECT_10_BCM_ACM_TEST_RESULTS.loc[
+                    SUBJECT_10_BCM_ACM_TEST_RESULTS["Accuracy"].idxmax(), "Band"
+                ],
+                "Best Model": SUBJECT_10_BCM_ACM_TEST_RESULTS.loc[
+                    SUBJECT_10_BCM_ACM_TEST_RESULTS["Accuracy"].idxmax(), "Model"
+                ],
+                "Best Test Accuracy": SUBJECT_10_BCM_ACM_TEST_RESULTS["Accuracy"].max(),
+            },
+            {
+                "Comparison": "BM vs AM",
+                "Status": "Completed" if SUBJECT_10_BM_AM_READY else "Pending",
+                "EEG Segments": SUBJECT_10_BM_AM_TOTAL_EPOCHS if SUBJECT_10_BM_AM_READY else pd.NA,
+                "Training": (
+                    int(SUBJECT_10_BM_AM_SPLIT.loc[0, "Samples"])
+                    if SUBJECT_10_BM_AM_READY
+                    else pd.NA
+                ),
+                "Validation": (
+                    int(SUBJECT_10_BM_AM_SPLIT.loc[1, "Samples"])
+                    if SUBJECT_10_BM_AM_READY
+                    else pd.NA
+                ),
+                "Test": (
+                    int(SUBJECT_10_BM_AM_SPLIT.loc[2, "Samples"])
+                    if SUBJECT_10_BM_AM_READY
+                    else pd.NA
+                ),
+                "Best Band": (
+                    SUBJECT_10_BM_AM_TEST_RESULTS.loc[
+                        SUBJECT_10_BM_AM_TEST_RESULTS["Accuracy"].idxmax(), "Band"
+                    ]
+                    if SUBJECT_10_BM_AM_READY and not SUBJECT_10_BM_AM_TEST_RESULTS.empty
+                    else "-"
+                ),
+                "Best Model": (
+                    SUBJECT_10_BM_AM_TEST_RESULTS.loc[
+                        SUBJECT_10_BM_AM_TEST_RESULTS["Accuracy"].idxmax(), "Model"
+                    ]
+                    if SUBJECT_10_BM_AM_READY and not SUBJECT_10_BM_AM_TEST_RESULTS.empty
+                    else "-"
+                ),
+                "Best Test Accuracy": (
+                    SUBJECT_10_BM_AM_TEST_RESULTS["Accuracy"].max()
+                    if SUBJECT_10_BM_AM_READY and not SUBJECT_10_BM_AM_TEST_RESULTS.empty
+                    else pd.NA
+                ),
+            },
+        ]
+    )
+    completed_data = summary_data[summary_data["Status"] == "Completed"].copy()
+    for numeric_column in [
+        "EEG Segments",
+        "Training",
+        "Validation",
+        "Test",
+        "Best Test Accuracy",
+    ]:
+        completed_data[numeric_column] = pd.to_numeric(
+            completed_data[numeric_column], errors="coerce"
+        )
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("Comparisons", "4")
+    metric_2.metric("Completed", f"{len(completed_data)} / 4")
+    metric_3.metric("EEG Channels", "4")
+    metric_4.metric("Total Features", "56")
+
+    (
+        overview_tab,
+        cross_condition_tab,
+        synthetic_validation_tab,
+        classification_tab,
+        conclusion_tab,
+    ) = st.tabs(
+        [
+            "Overview",
+            "Cross-Condition Analysis",
+            "Synthetic Data Validation",
+            "Classification Summary",
+            "Conclusion",
+        ]
+    )
+
+    with overview_tab:
+        st.subheader("All-condition overview")
+        with st.container(border=True):
+            st.write(
+                "This panel combines BCF vs ACF, BF vs AF, BCM vs ACM, and BM vs AM in one "
+                "summary. Select an individual comparison above to inspect its complete "
+                "preprocessing, feature extraction, ACGAN, results, and analysis panels."
+            )
+        overview_display = summary_data[
+            ["Comparison", "Status", "EEG Segments", "Best Band", "Best Model", "Best Test Accuracy"]
+        ].copy()
+        overview_display["Best Test Accuracy"] = overview_display["Best Test Accuracy"].map(
+            lambda value: "-" if pd.isna(value) else f"{value:.2%}"
+        )
+        st.dataframe(overview_display, use_container_width=True, hide_index=True)
+
+        with st.expander("Dataset split coverage", expanded=False):
+            statistics_display = summary_data[
+                ["Comparison", "Status", "EEG Segments", "Training", "Validation", "Test"]
+            ].copy()
+            st.dataframe(statistics_display, use_container_width=True, hide_index=True)
+
+    with cross_condition_tab:
+        st.subheader("Cross-condition analysis")
+        st.caption(
+            "This section compares the four condition pairs without treating All Conditions "
+            "as a fifth classification label."
+        )
+        (
+            subject_summary_tab,
+            paired_fdr_tab,
+            combined_pre_post_tab,
+        ) = st.tabs(
+            [
+                "Subject-Level Summary",
+                "Paired Statistics & FDR",
+                "Pre-Post Visualizations",
+            ]
+        )
+
+        with subject_summary_tab:
+            render_all_conditions_subject_level_summary()
+
+        with paired_fdr_tab:
+            render_all_conditions_paired_statistics()
+
+        with combined_pre_post_tab:
+            render_all_conditions_pre_post_visualizations()
+
+    with synthetic_validation_tab:
+        st.subheader("Synthetic data validation")
+        st.caption(
+            "Sample counts describe augmentation coverage. Feature quality, quantitative "
+            "similarity, and visual agreement are reported separately below."
+        )
+        quality_rows = [
+            {
+                "Comparison": "BCF vs ACF",
+                "Real Samples": int(SUBJECT_10_ACGAN["Real Samples"].sum()),
+                "Synthetic Samples": int(SUBJECT_10_ACGAN["Synthetic Samples"].sum()),
+                "Augmented Samples": int(SUBJECT_10_ACGAN["Augmented Samples"].sum()),
+                "Status": "Completed",
+            },
+            {
+                "Comparison": "BF vs AF",
+                "Real Samples": int(SUBJECT_10_BF_AF_ACGAN["Real Samples"].sum()),
+                "Synthetic Samples": int(SUBJECT_10_BF_AF_ACGAN["Synthetic Samples"].sum()),
+                "Augmented Samples": int(SUBJECT_10_BF_AF_ACGAN["Augmented Samples"].sum()),
+                "Status": "Completed",
+            },
+            {
+                "Comparison": "BCM vs ACM",
+                "Real Samples": int(SUBJECT_10_BCM_ACM_ACGAN["Real Samples"].sum()),
+                "Synthetic Samples": int(SUBJECT_10_BCM_ACM_ACGAN["Synthetic Samples"].sum()),
+                "Augmented Samples": int(SUBJECT_10_BCM_ACM_ACGAN["Augmented Samples"].sum()),
+                "Status": "Completed",
+            },
+        ]
+        if SUBJECT_10_BM_AM_READY:
+            quality_rows.append(
+                {
+                    "Comparison": "BM vs AM",
+                    "Real Samples": int(SUBJECT_10_BM_AM_ACGAN["Real Samples"].sum()),
+                    "Synthetic Samples": int(
+                        SUBJECT_10_BM_AM_ACGAN["Synthetic Samples"].sum()
+                    ),
+                    "Augmented Samples": int(
+                        SUBJECT_10_BM_AM_ACGAN["Augmented Samples"].sum()
+                    ),
+                    "Status": "Completed",
+                }
+            )
+        else:
+            quality_rows.append(
+                {
+                    "Comparison": "BM vs AM",
+                    "Real Samples": pd.NA,
+                    "Synthetic Samples": pd.NA,
+                    "Augmented Samples": pd.NA,
+                    "Status": "Pending",
+                }
+            )
+        quality_data = pd.DataFrame(quality_rows)
+        with st.expander("Synthetic sample coverage", expanded=False):
+            st.dataframe(quality_data, use_container_width=True, hide_index=True)
+
+        feature_quality_tab, quantitative_similarity_tab, visual_comparison_tab = st.tabs(
+            ["Feature Quality", "Quantitative Similarity", "Visual Comparison"]
+        )
+
+        with feature_quality_tab:
+            render_all_conditions_synthetic_feature_quality()
+
+        with quantitative_similarity_tab:
+            render_analysis_placeholder(
+                "Quantitative similarity across conditions",
+                "all-condition",
+                "This section will compare the configured distribution-similarity metrics "
+                "using the same scale across conditions.",
+                [
+                    "Real-synthetic similarity score by condition",
+                    "Correlation and distance metrics",
+                    "Wasserstein, KS, and MMD comparison",
+                    "Similarity ranking with interpretation limits",
+                ],
+            )
+
+        with visual_comparison_tab:
+            render_analysis_placeholder(
+                "Synthetic visual comparison across conditions",
+                "all-condition",
+                "This section will compare real-versus-synthetic distribution overlap and "
+                "latent-space coverage for every condition pair.",
+                [
+                    "Comparable histogram or KDE panels",
+                    "PCA, UMAP, or t-SNE panels",
+                    "Condition-level overlap and separation",
+                    "Class-conditional visual comparison",
+                ],
+            )
+
+    with classification_tab:
+        st.subheader("Classification summary across conditions")
+        classification_sources = [
+            (
+                "BCF vs ACF",
+                SUBJECT_10_TEST_RESULTS,
+                SUBJECT_10_TRAIN_RESULTS,
+                True,
+            ),
+            (
+                "BF vs AF",
+                SUBJECT_10_BF_AF_TEST_RESULTS,
+                SUBJECT_10_BF_AF_TRAIN_RESULTS,
+                True,
+            ),
+            (
+                "BCM vs ACM",
+                SUBJECT_10_BCM_ACM_TEST_RESULTS,
+                SUBJECT_10_BCM_ACM_TRAIN_RESULTS,
+                True,
+            ),
+            (
+                "BM vs AM",
+                SUBJECT_10_BM_AM_TEST_RESULTS,
+                SUBJECT_10_BM_AM_TRAIN_RESULTS,
+                SUBJECT_10_BM_AM_READY
+                and not SUBJECT_10_BM_AM_TEST_RESULTS.empty
+                and not SUBJECT_10_BM_AM_TRAIN_RESULTS.empty,
+            ),
+        ]
+        classification_rows = []
+        listed_results = []
+        for comparison, test_results, train_results, is_ready in classification_sources:
+            if is_ready:
+                best_test = test_results.loc[test_results["Accuracy"].idxmax()]
+                best_train = train_results.loc[train_results["Accuracy"].idxmax()]
+                classification_rows.append(
+                    {
+                        "Comparison": comparison,
+                        "Status": "Completed",
+                        "Best Test Band": best_test["Band"],
+                        "Best Test Model": best_test["Model"],
+                        "Best Test Accuracy": best_test["Accuracy"],
+                        "Best Training Band": best_train["Band"],
+                        "Best Training Model": best_train["Model"],
+                        "Best Training Accuracy": best_train["Accuracy"],
+                    }
+                )
+                for evaluation_set, results in [
+                    ("Test", test_results),
+                    ("Training", train_results),
+                ]:
+                    listed = results.copy()
+                    listed["Comparison"] = comparison
+                    listed["Evaluation Set"] = evaluation_set
+                    listed_results.append(listed)
+            else:
+                classification_rows.append(
+                    {
+                        "Comparison": comparison,
+                        "Status": "Pending",
+                        "Best Test Band": "-",
+                        "Best Test Model": "-",
+                        "Best Test Accuracy": pd.NA,
+                        "Best Training Band": "-",
+                        "Best Training Model": "-",
+                        "Best Training Accuracy": pd.NA,
+                    }
+                )
+
+        classification_data = pd.DataFrame(classification_rows)
+        classification_display = classification_data.copy()
+        for accuracy_column in ["Best Test Accuracy", "Best Training Accuracy"]:
+            classification_display[accuracy_column] = classification_display[accuracy_column].map(
+                lambda value: "-" if pd.isna(value) else f"{value:.2%}"
+            )
+        st.dataframe(classification_display, use_container_width=True, hide_index=True)
+
+        chart_data = classification_data[classification_data["Status"] == "Completed"].copy()
+        chart_data["Best Test Accuracy"] = pd.to_numeric(
+            chart_data["Best Test Accuracy"], errors="coerce"
+        )
+        chart_data["Best Training Accuracy"] = pd.to_numeric(
+            chart_data["Best Training Accuracy"], errors="coerce"
+        )
+        chart_data = chart_data.melt(
+            id_vars="Comparison",
+            value_vars=["Best Training Accuracy", "Best Test Accuracy"],
+            var_name="Evaluation",
+            value_name="Accuracy",
+        )
+        chart_data["Evaluation"] = chart_data["Evaluation"].replace(
+            {
+                "Best Training Accuracy": "Training",
+                "Best Test Accuracy": "Test",
+            }
+        )
+        figure = px.bar(
+            chart_data,
+            x="Comparison",
+            y="Accuracy",
+            color="Evaluation",
+            barmode="group",
+            text="Accuracy",
+            color_discrete_map={"Training": "#1F6B35", "Test": "#8FCF9C"},
+        )
+        figure.update_traces(texttemplate="%{text:.2%}", textposition="outside")
+        figure.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10),
+            plot_bgcolor="#FFFFFF",
+            paper_bgcolor="#FFFFFF",
+            legend_title_text="",
+            xaxis_title="",
+            yaxis_title="Best Accuracy",
+            yaxis=dict(range=[0, 1], tickformat=".0%"),
+        )
+        st.plotly_chart(figure, use_container_width=True)
+
+        if listed_results:
+            listed_data = pd.concat(listed_results, ignore_index=True)
+            model_summary = (
+                listed_data.groupby(["Comparison", "Evaluation Set", "Model"], as_index=False)
+                .agg(
+                    **{
+                        "Mean Listed Accuracy": ("Accuracy", "mean"),
+                        "Listed Configurations": ("Accuracy", "size"),
+                    }
+                )
+            )
+            model_summary_display = model_summary.copy()
+            model_summary_display["Mean Listed Accuracy"] = model_summary_display[
+                "Mean Listed Accuracy"
+            ].map(lambda value: f"{value:.2%}")
+            st.subheader("SVM vs 1D CNN within the available Top-5 lists")
+            st.dataframe(model_summary_display, use_container_width=True, hide_index=True)
+            st.caption(
+                "This table summarizes only the configurations included in each existing "
+                "Top-5 table; it is not a replacement for a full model-to-model evaluation."
+            )
+
+    with conclusion_tab:
+        ranked_results = completed_data.dropna(subset=["Best Test Accuracy"]).sort_values(
+            "Best Test Accuracy", ascending=False
+        )
+        best_overall = ranked_results.iloc[0]
+        gamma_results = ranked_results[ranked_results["Best Band"] == "Gamma"]
+        beta_results = ranked_results[ranked_results["Best Band"] == "Beta"]
+
+        gamma_summary = ", ".join(
+            f"{row['Comparison']} ({row['Best Test Accuracy']:.2%})"
+            for _, row in gamma_results.sort_values("Comparison").iterrows()
+        )
+        beta_summary = ", ".join(
+            f"{row['Comparison']} ({row['Best Test Accuracy']:.2%})"
+            for _, row in beta_results.sort_values("Comparison").iterrows()
+        )
+        accuracy_floor = ranked_results["Best Test Accuracy"].min()
+        accuracy_ceiling = ranked_results["Best Test Accuracy"].max()
+
+        st.subheader("Cross-condition conclusion")
+        with st.container(border=True):
+            st.subheader("Gamma and Beta jointly lead the results")
+            st.write(
+                f"Gamma is the leading band in {len(gamma_results)} of "
+                f"{len(ranked_results)} completed comparisons: {gamma_summary}. "
+                f"Beta leads {beta_summary}, the highest single listed test result, using "
+                f"{best_overall['Best Model']}. These results therefore point to both "
+                "Gamma and Beta as informative high-frequency EEG bands, rather than to "
+                "Beta alone."
+            )
+        with st.container(border=True):
+            st.subheader("Cross-condition interpretation")
+            st.write(
+                f"The best listed test accuracies are closely grouped from {accuracy_floor:.2%} "
+                f"to {accuracy_ceiling:.2%}, and all four condition-level winners use SVM. "
+                "Gamma is the more consistent condition-level leader, while Beta achieves "
+                "the strongest individual result. The narrow "
+                "range also indicates that the apparent advantage is condition-dependent; "
+                "it does not establish that one band or comparison is universally superior."
+            )
+        with st.container(border=True):
+            st.subheader("Scope and final takeaway")
+            st.write(
+                "This is a preliminary, descriptive analysis of only 10 users. Within this "
+                "cohort, Gamma and Beta should be treated as complementary priority bands for "
+                "follow-up analysis. Confirmation requires a larger independent cohort and "
+                "subject-wise validation before the findings can be generalized or interpreted "
+                "as robust cannabis-related EEG biomarkers."
+            )
+        st.info(
+            "Overall conclusion: retain both Gamma and Beta in subsequent modelling and "
+            "validate their contribution in a larger, independent sample."
+        )
+
+
+def render_subject_10_completed_comparison(
+    comparison_name,
+    condition_0,
+    condition_1,
+    total_epochs,
+    condition_epochs,
+    split_data,
+    acgan_data,
+    test_results,
+    train_results,
+    overview_title="About",
+    objective_text=None,
+    workflow_text=None,
+    channel_names=None,
+    include_random_forest=False,
+    model_section_title="Classification models",
+    acgan_metric_values=None,
+    augmentation_details=None,
+    dataset_count_column="Data Distribution",
+):
+    """Render a completed 10-subject comparison using a shared dashboard layout."""
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("EEG Segment", f"{total_epochs:,}")
+    metric_2.metric("EEG Channels", "4")
+    metric_3.metric("Feature Methods", "4")
+    metric_4.metric("Total Features", "56")
+
+    (
+        overview_tab,
+        dataset_tab,
+        preprocessing_tab,
+        feature_tab,
+        models_tab,
+        acgan_tab,
+        results_tab,
+        analysis_tab,
+        conclusion_tab,
+    ) = st.tabs(
+        [
+            "Overview",
+            "Dataset",
+            "Preprocessing",
+            "Feature Extraction",
+            "Baseline Models",
+            "ACGAN",
+            "Results",
+            "Analysis",
+            "Conclusion",
+        ]
+    )
+
+    with overview_tab:
+        left_column, right_column = st.columns(2)
+        with left_column:
+            with st.container(border=True):
+                st.subheader(overview_title)
+                st.write(
+                    objective_text
+                    or (
+                        f"Compare the {comparison_name} multi-subject cannabis EEG conditions "
+                        "using machine-learning and deep-learning models."
+                    )
+                )
+        with right_column:
+            with st.container(border=True):
+                st.subheader("Classification labels")
+                st.write(f"Label 0: {condition_0}, Before.")
+                st.write(f"Label 1: {condition_1}, After.")
+        with st.container(border=True):
+            st.subheader("Research workflow")
+            st.write(
+                workflow_text
+                or (
+                    "Raw EEG data → preprocessing → feature extraction → baseline modelling → "
+                    "ACGAN augmentation → final evaluation."
+                )
+            )
+
+    with dataset_tab:
+        st.subheader("Dataset summary")
+        dataset_1, dataset_2, dataset_3 = st.columns(3)
+        dataset_1.metric("Before Condition", f"{condition_epochs:,}")
+        dataset_2.metric("After Condition", f"{condition_epochs:,}")
+        dataset_3.metric("Epoch Shape", "(512, 4)")
+        conditions = pd.DataFrame(
+            {
+                "Condition": [condition_0, condition_1],
+                "Label": [0, 1],
+                dataset_count_column: [condition_epochs, condition_epochs],
+                "State": ["Before", "After"],
+            }
+        )
+        st.dataframe(conditions, use_container_width=True, hide_index=True)
+        st.subheader("EEG channels")
+        if channel_names:
+            channel_columns = st.columns(len(channel_names))
+            for column, channel_name in zip(channel_columns, channel_names):
+                column.metric("Channel", channel_name)
+        else:
+            st.caption(
+                "The study uses 4 EEG channels. Add the channel names here once they are finalised."
+            )
+
+    with preprocessing_tab:
+        render_preprocessing_tab()
+    with feature_tab:
+        render_feature_tab()
+
+    with models_tab:
+        st.subheader(model_section_title)
+        model_columns = st.columns(3 if include_random_forest else 2)
+        model_1 = model_columns[0]
+        with model_1:
+            with st.container(border=True):
+                st.subheader("SVM")
+                st.write(
+                    "Support Vector Machine for supervised classification between Label 0 and Label 1."
+                )
+        if include_random_forest:
+            with model_columns[1]:
+                with st.container(border=True):
+                    st.subheader("Random Forest")
+                    st.write(
+                        "Ensemble tree classifier for identifying nonlinear relationships in EEG features."
+                    )
+            cnn_column = model_columns[2]
+        else:
+            cnn_column = model_columns[1]
+        with cnn_column:
+            with st.container(border=True):
+                st.subheader("1D CNN")
+                st.write(
+                    "Deep-learning classifier using one-dimensional convolution over feature sequences."
+                )
+        st.write("")
+        st.subheader("Dataset split")
+        st.dataframe(split_data, use_container_width=True, hide_index=True)
+
+    with acgan_tab:
+        st.subheader("ACGAN-based data augmentation")
+        if acgan_metric_values is None:
+            acgan_metric_values = (total_epochs, total_epochs, total_epochs * 2)
+        real_metric, synthetic_metric, mixed_metric = acgan_metric_values
+        acgan_1, acgan_2, acgan_3 = st.columns(3)
+        acgan_1.metric("Real Training Data", f"{real_metric:,}")
+        acgan_2.metric("Synthetic Training Data", f"{synthetic_metric:,}")
+        acgan_3.metric("Mixed Training Data", f"{mixed_metric:,}")
+        with st.container(border=True):
+            st.subheader("Augmentation strategy")
+            details = augmentation_details or [
+                "ACGAN generates a synthetic counterpart for each real sample. The real and "
+                "synthetic samples are then combined for the classification experiment."
+            ]
+            for detail in details:
+                st.write(detail)
+        st.dataframe(acgan_data, use_container_width=True, hide_index=True)
+
+    with results_tab:
+        render_accuracy_chart(test_results, "Top 5 Accuracy on the Test Dataset")
+        test_display = test_results.copy()
+        test_display["Accuracy"] = test_display["Accuracy"].map(lambda value: f"{value:.2%}")
+        st.dataframe(test_display, use_container_width=True, hide_index=True)
+        best_result = test_results.loc[test_results["Accuracy"].idxmax()]
+        st.success(
+            f"Best test result: {best_result['Band']} band, {best_result['Model']}, "
+            f"{best_result['Data']}, {best_result['Accuracy']:.2%} accuracy."
+        )
+
+        st.write("")
+        render_accuracy_chart(train_results, "Top 5 Accuracy on the Training Dataset")
+        train_display = train_results.copy()
+        train_display["Accuracy"] = train_display["Accuracy"].map(lambda value: f"{value:.2%}")
+        st.dataframe(train_display, use_container_width=True, hide_index=True)
+
+    with analysis_tab:
+        render_subject_10_analysis(comparison_name, test_results, train_results)
+
+    with conclusion_tab:
+        render_subject_10_conclusion(comparison_name)
+
+def render_subject_10_pending_comparison(comparison_name, condition_0, condition_1):
+    """Render a 10-subject comparison whose experimental output is not available yet.
+
+    The layout matches the completed comparisons so the page stays visually
+    consistent, but no dataset or accuracy figures are shown until the real
+    values have been entered.
+    """
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("EEG Segment", f"{SUBJECT_10_BM_AM_TOTAL_EPOCHS:,}")
+    metric_2.metric("EEG Channels", "4")
+    metric_3.metric("Feature Methods", "4")
+    metric_4.metric("Total Features", "56")
+
+    (
+        overview_tab,
+        dataset_tab,
+        preprocessing_tab,
+        feature_tab,
+        models_tab,
+        acgan_tab,
+        results_tab,
+        analysis_tab,
+        conclusion_tab,
+    ) = st.tabs(
+        [
+            "Overview",
+            "Dataset",
+            "Preprocessing",
+            "Feature Extraction",
+            "Baseline Models",
+            "ACGAN",
+            "Results",
+            "Analysis",
+            "Conclusion",
+        ]
+    )
+
+    with overview_tab:
+        left_column, right_column = st.columns(2)
+        with left_column:
+            with st.container(border=True):
+                st.subheader("About")
+                st.write(
+                    f"Compare the {comparison_name} multi-subject cannabis EEG conditions "
+                    "using machine-learning and deep-learning models."
+                )
+        with right_column:
+            with st.container(border=True):
+                st.subheader("Classification labels")
+                st.write(f"Label 0: {condition_0}, Before.")
+                st.write(f"Label 1: {condition_1}, After.")
+        with st.container(border=True):
+            st.subheader("Research workflow")
+            st.write(
+                "Raw EEG data → preprocessing → feature extraction → baseline modelling → "
+                "ACGAN augmentation → final evaluation."
+            )
+
+    with dataset_tab:
+        with st.container(border=True):
+            st.subheader("Dataset status")
+            st.write(
+                f"Epoch counts for the {condition_0} and {condition_1} conditions have not "
+                "been entered yet."
+            )
+
+    with preprocessing_tab:
+        render_preprocessing_tab()
+    with feature_tab:
+        render_feature_tab()
+
+    with models_tab:
+        st.subheader("Classification models")
+        model_1, model_2 = st.columns(2)
+        with model_1:
+            with st.container(border=True):
+                st.subheader("SVM")
+                st.write("Support Vector Machine evaluated with the combined real and synthetic dataset.")
+        with model_2:
+            with st.container(border=True):
+                st.subheader("1D CNN")
+                st.write("One-dimensional convolutional neural network evaluated with the combined real and synthetic dataset.")
+        st.write("")
+        with st.container(border=True):
+            st.subheader("Dataset split")
+            st.write("The training, validation, and test split will appear here.")
+
+    with acgan_tab:
+        with st.container(border=True):
+            st.subheader("ACGAN-based data augmentation")
+            st.write(
+                "Real, synthetic, and mixed sample counts will appear here once the "
+                "augmentation run has been completed."
+            )
+
+    with results_tab:
+        with st.container(border=True):
+            st.subheader("Results status")
+            st.write(
+                "Top 5 accuracy on the training and test datasets will appear here once "
+                "the experiment has been evaluated."
+            )
+
+    with analysis_tab:
+        render_subject_10_pending_analysis(comparison_name)
+
+    with conclusion_tab:
+        with st.container(border=True):
+            st.subheader(f"Conclusion: {comparison_name}")
+            st.write("The conclusion will be written after the results have been evaluated.")
+
+
+def render_subject_10_bcf_acf():
+    """Render the completed BCF vs ACF dashboard for the 10-subject study."""
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric("EEG Segment", "8,540")
+    metric_2.metric("EEG Channels", "4")
+    metric_3.metric("Feature Methods", "4")
+    metric_4.metric("Total Features", "56")
+
+    (
+        overview_tab,
+        dataset_tab,
+        preprocessing_tab,
+        feature_tab,
+        models_tab,
+        acgan_tab,
+        results_tab,
+        analysis_tab,
+        conclusion_tab,
+    ) = st.tabs(
+        [
+            "Overview",
+            "Dataset",
+            "Preprocessing",
+            "Feature Extraction",
+            "Baseline Models",
+            "ACGAN",
+            "Results",
+            "Analysis",
+            "Conclusion",
+        ]
+    )
+
+    with overview_tab:
+        left_column, right_column = st.columns(2)
+        with left_column:
+            with st.container(border=True):
+                st.subheader("About")
+                st.write(
+                    "Compare multi-subject cannabis EEG conditions before and after cannabis "
+                    "consumption using machine-learning and deep-learning models."
+                )
+        with right_column:
+            with st.container(border=True):
+                st.subheader("Classification labels")
+                st.write("Label 0: BCF, Before Cannabis Consumption.")
+                st.write("Label 1: ACF, After Cannabis Consumption.")
+        with st.container(border=True):
+            st.subheader("Research workflow")
+            st.write(
+                "Raw EEG data → preprocessing → feature extraction → baseline modelling → "
+                "ACGAN augmentation → final evaluation."
+            )
+
+    with dataset_tab:
+        st.subheader("Dataset summary")
+        dataset_1, dataset_2, dataset_3 = st.columns(3)
+        dataset_1.metric("Before Condition", "4,270")
+        dataset_2.metric("After Condition", "4,270")
+        dataset_3.metric("Epoch Shape", "(512, 4)")
+        conditions = pd.DataFrame(
+            {
+                "Condition": ["BCF", "ACF"],
+                "Label": [0, 1],
+                "Data Distribution": [4270, 4270],
+                "State": ["Before", "After"],
+            }
+        )
+        st.dataframe(conditions, use_container_width=True, hide_index=True)
+        st.subheader("EEG channels")
+        st.caption("The study uses 4 EEG channels. Add the channel names here once they are finalised.")
+
+    with preprocessing_tab:
+        render_preprocessing_tab()
+    with feature_tab:
+        render_feature_tab()
+
+    with models_tab:
+        st.subheader("Classification models")
+        model_1, model_2 = st.columns(2)
+        with model_1:
+            with st.container(border=True):
+                st.subheader("SVM")
+                st.write("Support Vector Machine evaluated with the combined real and synthetic dataset.")
+        with model_2:
+            with st.container(border=True):
+                st.subheader("1D CNN")
+                st.write("One-dimensional convolutional neural network evaluated with the combined real and synthetic dataset.")
+        st.write("")
+        st.subheader("Dataset split")
+        st.dataframe(SUBJECT_10_SPLIT, use_container_width=True, hide_index=True)
+
+    with acgan_tab:
+        st.subheader("ACGAN-based data augmentation")
+        acgan_1, acgan_2, acgan_3 = st.columns(3)
+        acgan_1.metric("Real Training Data", "8,540")
+        acgan_2.metric("Synthetic Training Data", "8,540")
+        acgan_3.metric("Mixed Training Data", "17,080")
+        with st.container(border=True):
+            st.subheader("Augmentation strategy")
+            st.write(
+                "ACGAN generates a synthetic counterpart for each real sample. The real and "
+                "synthetic samples are then combined for the classification experiment."
+            )
+        st.dataframe(SUBJECT_10_ACGAN, use_container_width=True, hide_index=True)
+
+    with results_tab:
+        render_accuracy_chart(SUBJECT_10_TEST_RESULTS, "Top 5 Accuracy on the Test Dataset")
+        test_display = SUBJECT_10_TEST_RESULTS.copy()
+        test_display["Accuracy"] = test_display["Accuracy"].map(lambda value: f"{value:.2%}")
+        st.dataframe(test_display, use_container_width=True, hide_index=True)
+        st.success("Best test result: Beta band, SVM, Real + Synthetic, 84.70% accuracy.")
+
+        st.write("")
+        render_accuracy_chart(SUBJECT_10_TRAIN_RESULTS, "Top 5 Accuracy on the Training Dataset")
+        train_display = SUBJECT_10_TRAIN_RESULTS.copy()
+        train_display["Accuracy"] = train_display["Accuracy"].map(lambda value: f"{value:.2%}")
+        st.dataframe(train_display, use_container_width=True, hide_index=True)
+
+    with analysis_tab:
+        render_subject_10_analysis(
+            "BCF vs ACF",
+            SUBJECT_10_TEST_RESULTS,
+            SUBJECT_10_TRAIN_RESULTS,
+        )
+
+    with conclusion_tab:
+        render_subject_10_conclusion("BCF vs ACF")
+
+def find_topomap_archive_member(member_names, filename=None, prefix=None):
+    """Find one archive member by exact basename or numbered image prefix."""
+    matches = []
+    for member in member_names:
+        basename = Path(member).name
+        if filename is not None and basename.lower() == filename.lower():
+            matches.append(member)
+        elif (
+            prefix is not None
+            and basename.lower().endswith(".png")
+            and basename.startswith(f"{prefix}_")
+        ):
+            matches.append(member)
+    if len(matches) != 1:
+        target = filename if filename is not None else f"{prefix}_*.png"
+        raise ValueError(
+            f"Expected exactly one {target} file in the topomap archive; "
+            f"found {len(matches)}."
+        )
+    return matches[0]
+
+
+@st.cache_data
+def load_topomap_brain_results():
+    """Load, validate, and index all four topomap result archives."""
+    results = {}
+    missing_archives = []
+    image_prefixes = sorted(
+        set(TOPOMAP_CONDITION_IMAGE_PREFIX.values())
+        | set(TOPOMAP_DIFFERENCE_IMAGE_PREFIX.values())
+        | {"03"}
+    )
+
+    for comparison in ALL_CONDITIONS_COMPARISON_ORDER:
+        config = TOPOMAP_SOURCE_CONFIG[comparison]
+        archive_path = next(
+            (candidate for candidate in config["candidates"] if candidate.exists()),
+            None,
+        )
+        if archive_path is None:
+            missing_archives.append(
+                f"{comparison}: {config['candidates'][0].name}"
+            )
+            continue
+
+        with ZipFile(archive_path) as archive:
+            members = archive.namelist()
+            band_member = find_topomap_archive_member(
+                members, filename="statistics_band_level_5_tests.csv"
+            )
+            channel_member = find_topomap_archive_member(
+                members, filename="statistics_band_channel_20_tests.csv"
+            )
+            with archive.open(band_member) as csv_file:
+                band_summary = pd.read_csv(csv_file)
+            with archive.open(channel_member) as csv_file:
+                channel_summary = pd.read_csv(csv_file)
+            image_members = {
+                prefix: find_topomap_archive_member(members, prefix=prefix)
+                for prefix in image_prefixes
+            }
+
+        before = config["before"]
+        after = config["after"]
+        before_mean_column = f"Mean_{before}_4Sensors"
+        after_mean_column = f"Mean_{after}_4Sensors"
+        band_required = {
+            "Band",
+            "N_Subjects",
+            before_mean_column,
+            after_mean_column,
+            "Mean_Change",
+            "Percent_Change",
+            "Cohen_dz",
+            "p_FDR_5Bands",
+        }
+        channel_required = {
+            "Band",
+            "Channel",
+            "N_Subjects",
+            "Mean_Change",
+            "Percent_Change",
+            "Cohen_dz",
+            "p_FDR",
+        }
+        missing_band_columns = band_required.difference(band_summary.columns)
+        missing_channel_columns = channel_required.difference(
+            channel_summary.columns
+        )
+        if missing_band_columns:
+            raise ValueError(
+                f"{archive_path.name} band summary is missing: "
+                + ", ".join(sorted(missing_band_columns))
+            )
+        if missing_channel_columns:
+            raise ValueError(
+                f"{archive_path.name} channel summary is missing: "
+                + ", ".join(sorted(missing_channel_columns))
+            )
+
+        band_summary = band_summary.copy()
+        channel_summary = channel_summary.copy()
+        band_summary["Band"] = (
+            band_summary["Band"].astype(str).str.strip().str.title()
+        )
+        channel_summary["Band"] = (
+            channel_summary["Band"].astype(str).str.strip().str.title()
+        )
+        channel_summary["Channel"] = (
+            channel_summary["Channel"].astype(str).str.strip().str.upper()
+        )
+
+        band_numeric = [
+            "N_Subjects",
+            before_mean_column,
+            after_mean_column,
+            "Mean_Change",
+            "Percent_Change",
+            "Cohen_dz",
+            "p_FDR_5Bands",
+        ]
+        channel_numeric = [
+            "N_Subjects",
+            "Mean_Change",
+            "Percent_Change",
+            "Cohen_dz",
+            "p_FDR",
+        ]
+        for column in band_numeric:
+            band_summary[column] = pd.to_numeric(
+                band_summary[column], errors="coerce"
+            )
+        for column in channel_numeric:
+            channel_summary[column] = pd.to_numeric(
+                channel_summary[column], errors="coerce"
+            )
+        if band_summary[band_numeric].isna().any().any():
+            raise ValueError(
+                f"{archive_path.name} contains invalid band-level numeric values."
+            )
+        if channel_summary[channel_numeric].isna().any().any():
+            raise ValueError(
+                f"{archive_path.name} contains invalid channel-level numeric values."
+            )
+        if set(band_summary["Band"]) != set(TOPOMAP_BAND_ORDER):
+            raise ValueError(
+                f"{archive_path.name} must contain all five frequency bands."
+            )
+        expected_band_channels = {
+            (band, channel)
+            for band in TOPOMAP_BAND_ORDER
+            for channel in ALL_CONDITIONS_CHANNEL_ORDER
+        }
+        observed_band_channels = set(
+            zip(channel_summary["Band"], channel_summary["Channel"])
+        )
+        if observed_band_channels != expected_band_channels:
+            raise ValueError(
+                f"{archive_path.name} must contain one row for every "
+                "frequency-band and EEG-channel combination."
+            )
+        if not band_summary["p_FDR_5Bands"].between(0, 1).all():
+            raise ValueError(
+                f"{archive_path.name} contains band-level FDR values outside 0-1."
+            )
+        if not channel_summary["p_FDR"].between(0, 1).all():
+            raise ValueError(
+                f"{archive_path.name} contains channel-level FDR values outside 0-1."
+            )
+
+        results[comparison] = {
+            "before": before,
+            "after": after,
+            "before_mean_column": before_mean_column,
+            "after_mean_column": after_mean_column,
+            "source_path": str(archive_path),
+            "source_name": archive_path.name,
+            "band_summary": band_summary,
+            "channel_summary": channel_summary,
+            "image_members": image_members,
+        }
+
+    if missing_archives:
+        raise FileNotFoundError(
+            "Missing topomap result archives: " + "; ".join(missing_archives)
+        )
+    return results
+
+
+@st.cache_data
+def load_topomap_image_bytes(source_path, member_name):
+    """Read and validate one PNG image from a topomap result archive."""
+    with ZipFile(Path(source_path)) as archive:
+        image_data = archive.read(member_name)
+    if not image_data.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError(f"{Path(member_name).name} is not a valid PNG image.")
+    return image_data
+
+
+def format_topomap_percent(value):
+    """Format a signed percent change for topomap summaries."""
+    return f"{value:+.2f}%"
+
+
+def get_topomap_pair_headline(result):
+    """Create a concise data-driven headline for one condition pair."""
+    band_summary = result["band_summary"]
+    percentages = band_summary["Percent_Change"]
+    largest_band = band_summary.loc[percentages.abs().idxmax()]
+    positive_count = int((percentages > 0).sum())
+    negative_count = int((percentages < 0).sum())
+    largest_value = float(largest_band["Percent_Change"])
+
+    if percentages.abs().max() < 2:
+        direction_text = (
+            "Band-level averages were broadly stable"
+            if positive_count == 5 or negative_count == 5
+            else "Band-level changes were small and mixed"
+        )
+    elif positive_count == len(band_summary):
+        direction_text = "All five band-level averages increased"
+    elif negative_count == len(band_summary):
+        direction_text = "All five band-level averages decreased"
+    else:
+        direction_text = (
+            f"The pattern was mixed: {positive_count} band(s) increased and "
+            f"{negative_count} decreased"
+        )
+    return (
+        f"{direction_text}; the largest absolute shift was "
+        f"{largest_band['Band']} ({format_topomap_percent(largest_value)})."
+    )
+
+
+def get_topomap_key_findings(result):
+    """Create three transparent English findings for one condition pair."""
+    band_summary = result["band_summary"]
+    channel_summary = result["channel_summary"]
+    percentages = band_summary["Percent_Change"]
+    largest_band = band_summary.loc[percentages.abs().idxmax()]
+    largest_channel = channel_summary.loc[
+        channel_summary["Percent_Change"].abs().idxmax()
+    ]
+    positive_count = int((percentages > 0).sum())
+    negative_count = int((percentages < 0).sum())
+    zero_count = int((percentages == 0).sum())
+
+    if percentages.abs().max() < 2 and positive_count == len(band_summary):
+        pattern_text = (
+            "all five four-channel band means showed only small increases, "
+            "consistent with broadly stable band-level power"
+        )
+    elif percentages.abs().max() < 2:
+        pattern_text = (
+            "changes were small and mixed "
+            f"({positive_count} increased, {negative_count} decreased)"
+        )
+    elif positive_count == len(band_summary):
+        pattern_text = "all five four-channel band means increased"
+    elif negative_count == len(band_summary):
+        pattern_text = "all five four-channel band means decreased"
+    else:
+        pieces = []
+        if positive_count:
+            pieces.append(f"{positive_count} increased")
+        if negative_count:
+            pieces.append(f"{negative_count} decreased")
+        if zero_count:
+            pieces.append(f"{zero_count} was unchanged")
+        pattern_text = "the band-level pattern was mixed (" + ", ".join(pieces) + ")"
+
+    band_fdr_count = int((band_summary["p_FDR_5Bands"] < 0.05).sum())
+    channel_fdr_count = int((channel_summary["p_FDR"] < 0.05).sum())
+    findings = [
+        (
+            f"At the four-channel level, {pattern_text}. "
+            f"{largest_band['Band']} had the largest absolute percentage shift "
+            f"({format_topomap_percent(largest_band['Percent_Change'])}; "
+            f"Cohen's dz={largest_band['Cohen_dz']:+.3f}, "
+            f"FDR q={largest_band['p_FDR_5Bands']:.4f})."
+        ),
+        (
+            f"The largest descriptive band-by-channel change was "
+            f"{largest_channel['Band']} at {largest_channel['Channel']} "
+            f"({format_topomap_percent(largest_channel['Percent_Change'])}; "
+            f"Cohen's dz={largest_channel['Cohen_dz']:+.3f}, "
+            f"FDR q={largest_channel['p_FDR']:.4f})."
+        ),
+    ]
+    if band_fdr_count == 0 and channel_fdr_count == 0:
+        findings.append(
+            "No band-level result (0/5) or band-by-channel result (0/20) "
+            "remained significant after Benjamini-Hochberg FDR correction. "
+            "The spatial colour patterns should therefore be interpreted as "
+            "descriptive, not confirmatory."
+        )
+    else:
+        findings.append(
+            f"FDR-confirmed results: {band_fdr_count}/5 at band level and "
+            f"{channel_fdr_count}/20 at band-by-channel level."
+        )
+    return findings
+
+
+def build_topomap_cross_condition_figure(results):
+    """Build an annotated cross-condition heatmap of band-level changes."""
+    matrix = pd.DataFrame(
+        {
+            comparison: (
+                results[comparison]["band_summary"]
+                .set_index("Band")["Percent_Change"]
+                .reindex(TOPOMAP_BAND_ORDER)
+            )
+            for comparison in ALL_CONDITIONS_COMPARISON_ORDER
+        }
+    ).T
+    maximum_change = max(5.0, float(matrix.abs().max().max()))
+    figure = go.Figure(
+        go.Heatmap(
+            z=matrix.values,
+            x=matrix.columns.tolist(),
+            y=matrix.index.tolist(),
+            zmin=-maximum_change,
+            zmax=maximum_change,
+            zmid=0,
+            colorscale=[
+                [0.00, "#2F80ED"],
+                [0.35, "#A9CFF5"],
+                [0.50, "#F7F7F4"],
+                [0.65, "#F7B38B"],
+                [1.00, "#D95F59"],
+            ],
+            colorbar=dict(title="Mean paired<br>change (%)", thickness=14),
+            hovertemplate=(
+                "Comparison: %{y}<br>Band: %{x}<br>"
+                "Mean paired change: %{z:+.2f}%<extra></extra>"
+            ),
+        )
+    )
+    for comparison in matrix.index:
+        for band in matrix.columns:
+            value = float(matrix.loc[comparison, band])
+            figure.add_annotation(
+                x=band,
+                y=comparison,
+                text=format_topomap_percent(value),
+                showarrow=False,
+                font=dict(
+                    size=12,
+                    color=(
+                        "#FFFFFF"
+                        if abs(value) >= maximum_change * 0.52
+                        else "#24313A"
+                    ),
+                ),
+            )
+    figure.update_layout(
+        title=(
+            "<b>Cross-Condition Absolute Band-Power Change</b><br>"
+            "<sup>Four-channel mean · after minus before · descriptive paired change</sup>"
+        ),
+        xaxis_title="Frequency band",
+        yaxis_title="",
+        yaxis_autorange="reversed",
+        showlegend=False,
+    )
+    figure = style_all_conditions_figure(figure, 430)
+    figure.update_layout(margin=dict(l=25, r=30, t=100, b=45))
+    return figure
+
+
+def prepare_topomap_band_table(result):
+    """Return a presentation-ready band-level statistics table."""
+    data = result["band_summary"].copy()
+    data["Band"] = pd.Categorical(
+        data["Band"], categories=TOPOMAP_BAND_ORDER, ordered=True
+    )
+    data = data.sort_values("Band")
+    display = pd.DataFrame(
+        {
+            "Band": data["Band"].astype(str),
+            f"Mean {result['before']}": data[result["before_mean_column"]].map(
+                lambda value: f"{value:,.2f}"
+            ),
+            f"Mean {result['after']}": data[result["after_mean_column"]].map(
+                lambda value: f"{value:,.2f}"
+            ),
+            "Mean change": data["Mean_Change"].map(
+                lambda value: f"{value:+,.2f}"
+            ),
+            "Change (%)": data["Percent_Change"].map(format_topomap_percent),
+            "Cohen's dz": data["Cohen_dz"].map(
+                lambda value: f"{value:+.3f}"
+            ),
+            "FDR q": data["p_FDR_5Bands"].map(
+                lambda value: f"{value:.4f}"
+            ),
+            "FDR result": data["p_FDR_5Bands"].map(
+                lambda value: "Significant" if value < 0.05 else "Not significant"
+            ),
+        }
+    )
+    return display
+
+
+def prepare_topomap_channel_table(result, selected_band):
+    """Return a presentation-ready band-by-channel statistics table."""
+    data = result["channel_summary"].copy()
+    if selected_band != "All bands":
+        data = data[data["Band"] == selected_band]
+    band_rank = {band: index for index, band in enumerate(TOPOMAP_BAND_ORDER)}
+    channel_rank = {
+        channel: index
+        for index, channel in enumerate(ALL_CONDITIONS_CHANNEL_ORDER)
+    }
+    data["_Band_Order"] = data["Band"].map(band_rank)
+    data["_Channel_Order"] = data["Channel"].map(channel_rank)
+    data = data.sort_values(["_Band_Order", "_Channel_Order"])
+    return pd.DataFrame(
+        {
+            "Band": data["Band"],
+            "Channel": data["Channel"],
+            "Mean change": data["Mean_Change"].map(
+                lambda value: f"{value:+,.2f}"
+            ),
+            "Change (%)": data["Percent_Change"].map(format_topomap_percent),
+            "Cohen's dz": data["Cohen_dz"].map(
+                lambda value: f"{value:+.3f}"
+            ),
+            "FDR q": data["p_FDR"].map(lambda value: f"{value:.4f}"),
+            "FDR result": data["p_FDR"].map(
+                lambda value: "Significant" if value < 0.05 else "Not significant"
+            ),
+        }
+    )
+
+
+def render_subject_10_topomap_brain():
+    """Render four-condition scalp topomaps with data-backed findings."""
+    st.subheader("Topomap Brain")
+    st.caption(
+        "Absolute EEG band-power distributions and paired changes across TP9, "
+        "AF7, AF8, and TP10 for all four condition comparisons."
+    )
+
+    try:
+        results = load_topomap_brain_results()
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        BadZipFile,
+        pd.errors.ParserError,
+    ) as error:
+        st.error(f"The topomap results could not be loaded: {error}")
+        with st.expander("Required topomap result archives", expanded=True):
+            st.markdown(
+                """
+- `topomap_BCF_ACF_results.zip`
+- `topomap_BF_AF_results.zip`
+- `topomap_BCM_ACM_results.zip`
+- `topomap_BM_AM_results.zip`
+                """
+            )
+            st.caption(
+                "Place the four archives beside app.py, in data/, or in assets/data/."
+            )
+        return
+
+    with st.container(border=True):
+        st.info(
+            "These topomaps interpolate scalp-level measurements from four EEG "
+            "electrodes. They do not localize neural sources inside the brain, "
+            "and colour between electrodes is not a direct measurement."
+        )
+        st.write(
+            "Statistics use subject-level condition means from 10 paired subjects. "
+            "Wilcoxon tests are corrected with Benjamini-Hochberg FDR separately "
+            "across five bands and across 20 band-by-channel tests."
+        )
+
+    summary_1, summary_2, summary_3, summary_4 = st.columns(4)
+    summary_1.metric("Comparisons", len(results))
+    summary_2.metric("Paired Subjects", "10")
+    summary_3.metric("Frequency Bands", len(TOPOMAP_BAND_ORDER))
+    summary_4.metric("Scalp Channels", len(ALL_CONDITIONS_CHANNEL_ORDER))
+
+    st.markdown("### Cross-condition overview")
+    overview_columns = st.columns(2)
+    for index, comparison in enumerate(ALL_CONDITIONS_COMPARISON_ORDER):
+        with overview_columns[index % 2]:
+            with st.container(border=True):
+                st.markdown(f"**{comparison}**")
+                st.write(get_topomap_pair_headline(results[comparison]))
+
+    st.plotly_chart(
+        build_topomap_cross_condition_figure(results),
+        use_container_width=True,
+        key="topomap_cross_condition_change",
+    )
+    st.caption(
+        "Red denotes a higher after-condition mean and blue a lower after-condition "
+        "mean. The heatmap summarizes four-channel band means; it does not replace "
+        "the channel-level topomaps below."
+    )
+
+    total_band_fdr = sum(
+        int((result["band_summary"]["p_FDR_5Bands"] < 0.05).sum())
+        for result in results.values()
+    )
+    total_channel_fdr = sum(
+        int((result["channel_summary"]["p_FDR"] < 0.05).sum())
+        for result in results.values()
+    )
+    if total_band_fdr == 0 and total_channel_fdr == 0:
+        st.warning(
+            "Across all four comparisons, no band-level or band-by-channel result "
+            "remained significant after FDR correction. Interpret every spatial "
+            "pattern below as descriptive evidence."
+        )
+
+    st.divider()
+    st.markdown("### Explore one condition pair")
+    selected_comparison = st.radio(
+        "Condition pair",
+        ALL_CONDITIONS_COMPARISON_ORDER,
+        horizontal=True,
+        key="topomap_condition_pair",
+    )
+    result = results[selected_comparison]
+    band_summary = result["band_summary"]
+    channel_summary = result["channel_summary"]
+    largest_band = band_summary.loc[
+        band_summary["Percent_Change"].abs().idxmax()
+    ]
+    largest_channel = channel_summary.loc[
+        channel_summary["Percent_Change"].abs().idxmax()
+    ]
+
+    metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+    metric_1.metric(
+        "Largest Band Shift",
+        f"{largest_band['Band']} {format_topomap_percent(largest_band['Percent_Change'])}",
+    )
+    metric_2.metric(
+        "Largest Channel Shift",
+        f"{largest_channel['Band']} · {largest_channel['Channel']}",
+    )
+    metric_3.metric(
+        "Band-Level FDR",
+        f"{int((band_summary['p_FDR_5Bands'] < 0.05).sum())} / 5",
+    )
+    metric_4.metric(
+        "Band × Channel FDR",
+        f"{int((channel_summary['p_FDR'] < 0.05).sum())} / 20",
+    )
+
+    with st.container(border=True):
+        st.markdown(f"#### Key findings · {selected_comparison}")
+        for finding in get_topomap_key_findings(result):
+            st.markdown(f"- {finding}")
+
+    view_mode = st.radio(
+        "Visualization",
+        ["Condition maps", "Paired difference", "Percent-change heatmap"],
+        horizontal=True,
+        key="topomap_visualization",
+    )
+    selected_band = "All bands"
+    if view_mode != "Percent-change heatmap":
+        selected_band = st.selectbox(
+            "Frequency band",
+            ["All bands"] + TOPOMAP_BAND_ORDER,
+            key="topomap_frequency_band",
+        )
+
+    if view_mode == "Condition maps":
+        image_prefix = TOPOMAP_CONDITION_IMAGE_PREFIX[selected_band]
+        image_caption = (
+            f"Group-mean absolute band power for {result['before']} and "
+            f"{result['after']}. Each displayed band uses one shared scale "
+            "across the two conditions."
+        )
+    elif view_mode == "Paired difference":
+        image_prefix = TOPOMAP_DIFFERENCE_IMAGE_PREFIX[selected_band]
+        image_caption = (
+            f"Mean paired change ({result['after']} − {result['before']}). "
+            "Blue indicates a decrease, white is near zero, and red indicates "
+            "an increase."
+        )
+    else:
+        image_prefix = "03"
+        image_caption = (
+            f"Mean paired percentage change ({result['after']} − "
+            f"{result['before']}) by frequency band and EEG channel."
+        )
+
+    image_member = result["image_members"][image_prefix]
+    image_data = load_topomap_image_bytes(
+        result["source_path"], image_member
+    )
+    if selected_band == "All bands" and view_mode != "Percent-change heatmap":
+        _, image_column, _ = st.columns([1.25, 3.5, 1.25])
+        with image_column:
+            st.image(
+                image_data,
+                caption=image_caption,
+                use_container_width=True,
+            )
+    else:
+        st.image(
+            image_data,
+            caption=image_caption,
+            use_container_width=True,
+        )
+
+    with st.expander("View statistical detail", expanded=False):
+        st.markdown("##### Four-channel band summary")
+        st.dataframe(
+            prepare_topomap_band_table(result),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("##### Band-by-channel summary")
+        st.caption(
+            "The channel table follows the selected frequency band; All bands "
+            "shows all 20 tests."
+        )
+        st.dataframe(
+            prepare_topomap_channel_table(result, selected_band),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with st.expander("Method and interpretation notes", expanded=False):
+        st.markdown(
+            f"""
+- Change is defined as **{result['after']} − {result['before']}** after averaging epochs within each subject and condition.
+- The condition maps use a shared colour scale within each band and comparison. Difference maps use a zero-centred scale.
+- Only four electrodes were measured (TP9, AF7, AF8, and TP10); values between them are interpolated and should not be treated as directly observed.
+- The signal unit remains **raw-unit²** until the input EEG unit is confirmed. If the input is in microvolts, the power unit can be relabelled as µV².
+- Effect sizes and FDR-adjusted q-values should be read together. A non-significant result is not proof of no effect, particularly with 10 paired subjects.
+            """
+        )
+        st.caption(f"Data source: {result['source_name']}")
+
+
+def render_subject_10():
+    st.caption("EXPERIMENTAL REPORT 02")
+    st.title("EEG Data Analysis of 10 Cannabis Subjects")
+    st.write(
+        "Multi-subject cannabis EEG analysis across 10 users, including comparative "
+        "classification of BCF vs ACF, BF vs AF, BCM vs ACM, and BM vs AM conditions."
+    )
+    if st.button("Back to all reports", key="back_subject_10"):
+        return_to_home()
+
+    st.write("")
+    comparison_name = st.radio(
+        "Select comparison",
+        options=[
+            "BCF vs ACF",
+            "BF vs AF",
+            "BCM vs ACM",
+            "BM vs AM",
+            "All Conditions",
+            "Topomap Brain",
+        ],
+        horizontal=True,
+        key="subject_10_comparison",
+    )
+    st.write("")
+
+    if comparison_name == "BCF vs ACF":
+        render_subject_10_bcf_acf()
+    elif comparison_name == "BF vs AF":
+        render_subject_10_completed_comparison(
+            comparison_name="BF vs AF",
+            condition_0="BF",
+            condition_1="AF",
+            total_epochs=3600,
+            condition_epochs=1800,
+            split_data=SUBJECT_10_BF_AF_SPLIT,
+            acgan_data=SUBJECT_10_BF_AF_ACGAN,
+            test_results=SUBJECT_10_BF_AF_TEST_RESULTS,
+            train_results=SUBJECT_10_BF_AF_TRAIN_RESULTS,
+        )
+    elif comparison_name == "BCM vs ACM":
+        render_subject_10_completed_comparison(
+            comparison_name="BCM vs ACM",
+            condition_0="BCM",
+            condition_1="ACM",
+            total_epochs=8220,
+            condition_epochs=4110,
+            split_data=SUBJECT_10_BCM_ACM_SPLIT,
+            acgan_data=SUBJECT_10_BCM_ACM_ACGAN,
+            test_results=SUBJECT_10_BCM_ACM_TEST_RESULTS,
+            train_results=SUBJECT_10_BCM_ACM_TRAIN_RESULTS,
+        )
+    elif comparison_name == "All Conditions":
+        render_subject_10_all_conditions()
+    elif comparison_name == "Topomap Brain":
+        render_subject_10_topomap_brain()
+    elif SUBJECT_10_BM_AM_READY:
+        render_subject_10_completed_comparison(
+            comparison_name="BM vs AM",
+            condition_0="BM",
+            condition_1="AM",
+            total_epochs=SUBJECT_10_BM_AM_TOTAL_EPOCHS,
+            condition_epochs=SUBJECT_10_BM_AM_CONDITION_EPOCHS,
+            split_data=SUBJECT_10_BM_AM_SPLIT,
+            acgan_data=SUBJECT_10_BM_AM_ACGAN,
+            test_results=SUBJECT_10_BM_AM_TEST_RESULTS,
+            train_results=SUBJECT_10_BM_AM_TRAIN_RESULTS,
+            overview_title="About",
+            objective_text=(
+                "Compare BM vs AM multi-subject cannabis EEG conditions using "
+                "machine-learning and deep-learning models."
+            ),
+            workflow_text=(
+                "Raw EEG data → preprocessing → feature extraction → "
+                "baseline modelling → ACGAN augmentation → final evaluation."
+            ),
+            channel_names=["RAW_TP9", "RAW_AF7", "RAW_AF8", "RAW_TP10"],
+            include_random_forest=True,
+            model_section_title="Baseline classifiers",
+            acgan_metric_values=(7440, 7440, 10416),
+            augmentation_details=[
+                "ACGAN generates synthetic data for each feature set. Real and synthetic "
+                "samples are combined for model training and evaluation.",
+                "Frequency-band feature sets contain 24 features, while the All Bands "
+                "feature set contains 56 features.",
+            ],
+            dataset_count_column="Epochs",
+        )
+    else:
+        render_subject_10_pending_comparison(
+            comparison_name="BM vs AM",
+            condition_0="BM",
+            condition_1="AM",
+        )
+
+def render_empty_report(subject_name, report_number, user_count):
+    st.caption(f"EXPERIMENTAL REPORT {report_number}")
+    st.title(subject_name)
+    st.write(
+        f"This multi-subject cannabis EEG report is prepared for a comparative analysis "
+        f"across {user_count} users."
+    )
+    st.write(
+        "The dashboard structure is ready. Dataset information, preprocessing outputs, "
+        "feature extraction, ACGAN training, model evaluation, and classification results "
+        "will be added after the data-processing workflow is completed."
+    )
+    if st.button("Back to all reports", key=f"back_{subject_name}"):
+        return_to_home()
+
+    overview_tab, dataset_tab, models_tab, results_tab = st.tabs(["Overview", "Dataset", "Baseline Models", "Results"])
+    with overview_tab:
+        with st.container(border=True):
+            st.subheader("Report introduction")
+            st.write(f"This section will provide the research objective and experimental workflow for the {user_count}-user study.")
+    with dataset_tab:
+        with st.container(border=True):
+            st.subheader("Dataset status")
+            st.write("Dataset files have not been added yet. The EEG data will appear here.")
+    with models_tab:
+        with st.container(border=True):
+            st.subheader("Model status")
+            st.write("Baseline model configuration and ACGAN augmentation results will be added here.")
+    with results_tab:
+        with st.container(border=True):
+            st.subheader("Results status")
+            st.write("Accuracy metrics, training curves, confusion matrices, and classification reports will be added here.")
+
+
+current_report = st.query_params.get("report", "home")
+if current_report == "subject_02":
+    render_subject_02()
+elif current_report == "subject_10":
+    render_subject_10()
+elif current_report == "subject_30":
+    render_empty_report("Subject 30", "03", "30")
+else:
+    render_landing_page()
