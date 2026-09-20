@@ -1370,8 +1370,8 @@ def render_landing_page():
             "EXPERIMENTAL REPORT 02",
             "EEG Data Analysis of 10 Cannabis Subjects",
             "Multi-subject cannabis EEG analysis across 10 users, including comparative "
-            "classification of BCF vs ACF, BF vs AF, and BCM vs ACM conditions.",
-            "3 Comparative Conditions",
+            "classification of BCF vs ACF, BF vs AF, BCM vs ACM, and BM vs AM conditions.",
+            "4 Comparative Conditions",
             "Explore Report",
             "subject_10",
         )
